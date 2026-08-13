@@ -105,7 +105,8 @@ ul {
 .backlog-form button,
 .section-head button,
 .panel-actions button,
-.link-mode {
+.link-mode,
+.tfs-actions button {
   background: transparent;
   border: 1px solid rgba(232, 220, 200, 0.18);
   color: #ebe4d6;
@@ -117,7 +118,8 @@ ul {
 .section-head button:hover,
 .backlog-form button:hover,
 .panel-actions button:hover,
-.link-mode:hover {
+.link-mode:hover,
+.tfs-actions button:hover {
   border-color: #d06a32;
   color: #f3ece0;
 }
@@ -198,6 +200,48 @@ ul {
   border: 1px solid rgba(232, 220, 200, 0.18);
   padding: 6px 8px;
   border-radius: 2px;
+}
+
+.tfs-pop {
+  width: 400px;
+  display: grid;
+  gap: 10px;
+}
+
+.tfs-pop label {
+  display: grid;
+  gap: 4px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #9a9184;
+}
+
+.tfs-pop input {
+  width: 100%;
+  background: #131210;
+  border: 1px solid rgba(232, 220, 200, 0.18);
+  padding: 6px 8px;
+  border-radius: 2px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+  color: #ebe4d6;
+}
+
+.tfs-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.tfs-msg {
+  padding: 0;
+}
+
+.tfs-info {
+  color: #b7c79a;
+  font-size: 12px;
 }
 
 .backlog {

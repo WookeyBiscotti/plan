@@ -31,6 +31,7 @@ type Action =
   | { type: 'add-person'; name: string; role: string }
   | { type: 'patch-person'; personId: Id; patch: { name?: string; role?: string } }
   | { type: 'remove-person'; personId: Id }
+  | { type: 'import-tasks'; tasks: Task[] }
   | { type: 'reset' }
 
 function reducer(state: ProjectState, action: Action): ProjectState {
@@ -176,6 +177,22 @@ function reducer(state: ProjectState, action: Action): ProjectState {
         }),
       }
     }
+    case 'import-tasks': {
+      const existing = new Set(state.tasks.map((task) => task.id))
+      const incoming = action.tasks.filter((task) => !existing.has(task.id))
+      if (incoming.length === 0) return state
+      const known = new Set([...existing, ...incoming.map((task) => task.id)])
+      return {
+        ...state,
+        tasks: [
+          ...state.tasks,
+          ...incoming.map((task) => ({
+            ...task,
+            dependsOn: task.dependsOn.filter((id) => known.has(id)),
+          })),
+        ],
+      }
+    }
     case 'reset':
       return createSeed()
   }
@@ -202,6 +219,7 @@ type Store = {
   addPerson: (name: string, role: string) => void
   patchPerson: (personId: Id, patch: { name?: string; role?: string }) => void
   removePerson: (personId: Id) => void
+  importTasks: (tasks: Task[]) => number
   reset: () => void
 }
 
@@ -270,6 +288,13 @@ export function PlanProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'remove-person', personId })
   }, [])
 
+  const importTasks = useCallback((tasks: Task[]) => {
+    const existing = new Set(state.tasks.map((task) => task.id))
+    const added = tasks.filter((task) => !existing.has(task.id)).length
+    if (added > 0) dispatch({ type: 'import-tasks', tasks })
+    return added
+  }, [state.tasks])
+
   const reset = useCallback(() => {
     dispatch({ type: 'reset' })
     setSelectedId('pay')
@@ -295,6 +320,7 @@ export function PlanProvider({ children }: { children: ReactNode }) {
       addPerson,
       patchPerson,
       removePerson,
+      importTasks,
       reset,
     }),
     [
@@ -313,6 +339,7 @@ export function PlanProvider({ children }: { children: ReactNode }) {
       addPerson,
       patchPerson,
       removePerson,
+      importTasks,
       reset,
     ],
   )

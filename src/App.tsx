@@ -4,6 +4,7 @@ import { daysLabel, formatDayMonth } from './dates'
 import { TaskPanel } from './TaskPanel'
 import { TeamEditor } from './TeamEditor'
 import { Timeline } from './Timeline'
+import { TfsImportDialog } from './TfsImportDialog'
 import { PlanProvider, usePlan } from './store'
 
 function Shell() {
@@ -46,6 +47,7 @@ function Shell() {
             </p>
           )}
           <div className="top-actions">
+            <TfsImportDialog />
             <TeamEditor />
             <button type="button" onClick={reset}>
               Сбросить демо

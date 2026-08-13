@@ -21,3 +21,19 @@ npm run dev
 ```
 
 Откройте http://localhost:5173
+
+## Сборка
+
+```bash
+npm run build
+```
+
+Артефакты — в папке `dist/`.
+
+## GitHub Pages
+
+При push в `master` или `main` workflow [deploy-gh-pages.yml](.github/workflows/deploy-gh-pages.yml) собирает статический сайт и публикует его в ветку `gh-pages`.
+
+В **Settings → Pages → Build and deployment** укажите источник **Deploy from a branch**, ветка **`gh-pages`**, папка **`/ (root)`**.
+
+Сайт: https://wookeybiscotti.github.io/plan/
