@@ -13,6 +13,7 @@ import {
 } from './dates'
 import { usePlan, useRootSelected } from './store'
 import { TrashIcon, LockIcon } from './icons'
+import { TfsLink } from './TfsLink'
 import type { EpicStats, Id, Person, Placement, Task } from './types'
 import { hasExternalBlockers } from './tfsImport'
 
@@ -226,6 +227,7 @@ export function Timeline() {
                     onClick={() => setSelectedId(task.id)}
                   >
                     <span>{task.title}</span>
+                    <TfsLink task={task} className="tfs-link tfs-link-inline" />
                     <em>
                       {kids.length > 0 && stats
                         ? `${stats.spanDays}д / ${stats.sumParts}д`
@@ -401,6 +403,7 @@ function Lane({
               title={`${task.title} · ${placement.start} → ${placement.end}${locked ? ' · есть внешние блокеры' : ''}`}
             >
               <span className="task-bar-label">{task.title}</span>
+              <TfsLink task={task} className="tfs-link tfs-link-inline" />
               {locked && <LockIcon className="task-lock" />}
             </button>
           )

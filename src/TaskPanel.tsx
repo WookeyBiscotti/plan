@@ -4,6 +4,7 @@ import { wouldCycle } from './schedule'
 import { usePlan, useRootSelected } from './store'
 import { TfsFieldsModal } from './TfsFieldsModal'
 import { ExternalBlockersList } from './ExternalBlockersList'
+import { TfsLink } from './TfsLink'
 import { hasTfsFields } from './tfsFieldView'
 import type { Id, Task } from './types'
 
@@ -69,6 +70,7 @@ export function TaskPanel() {
             />
           </div>
           <div className="panel-head-actions">
+            <TfsLink task={root} />
             <TfsFieldsButton task={root} onShow={setFieldsTask} />
             <button type="button" className="icon-btn" onClick={() => setSelectedId(null)} aria-label="Закрыть">
               ×
@@ -101,14 +103,16 @@ export function TaskPanel() {
             const dep = state.tasks.find((task) => task.id === depId)
             if (!dep) return null
             return (
-              <button
-                key={depId}
-                type="button"
-                className="chip is-on"
-                onClick={() => setSelectedId(depId)}
-              >
-                {dep.title}
-              </button>
+              <span key={depId} className="chip-with-link">
+                <button
+                  type="button"
+                  className="chip is-on"
+                  onClick={() => setSelectedId(depId)}
+                >
+                  {dep.title}
+                </button>
+                <TfsLink task={dep} />
+              </span>
             )
           })}
         </div>
@@ -262,6 +266,7 @@ function SubtaskRow({
           onChange={(e) => onPatch(task.id, { title: e.target.value })}
         />
         {critical && <span className="crit">крит.</span>}
+        <TfsLink task={task} />
         <TfsFieldsButton task={task} onShow={onShowFields} />
       </div>
       <div className="subtask-row">
@@ -307,15 +312,17 @@ function SubtaskRow({
           const on = task.dependsOn.includes(other.id)
           const blocked = !on && wouldCycle(allTasks, task.id, other.id)
           return (
-            <button
-              key={other.id}
-              type="button"
-              className={`chip${on ? ' is-on' : ''}`}
-              disabled={blocked}
-              onClick={() => onToggleDep(task.id, other.id)}
-            >
-              {other.title}
-            </button>
+            <span key={other.id} className="chip-with-link">
+              <button
+                type="button"
+                className={`chip${on ? ' is-on' : ''}`}
+                disabled={blocked}
+                onClick={() => onToggleDep(task.id, other.id)}
+              >
+                {other.title}
+              </button>
+              <TfsLink task={other} />
+            </span>
           )
         })}
         {others.length === 0 && <em>нет других</em>}

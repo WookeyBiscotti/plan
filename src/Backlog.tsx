@@ -1,6 +1,7 @@
 import { useMemo, useState, type DragEvent, type FormEvent, type MouseEvent } from 'react'
 import { daysLabel } from './dates'
 import { TrashIcon } from './icons'
+import { TfsLink } from './TfsLink'
 import { usePlan } from './store'
 
 function matchesFilter(title: string, tfsId: number | undefined, query: string): boolean {
@@ -86,7 +87,9 @@ export function Backlog() {
               >
                 <div className="backlog-card-top">
                   <span className="backlog-title">{task.title}</span>
-                  <button
+                  <div className="backlog-card-actions">
+                    <TfsLink task={task} />
+                    <button
                     type="button"
                     className="backlog-trash"
                     aria-label={`Удалить «${task.title}»`}
@@ -98,6 +101,7 @@ export function Backlog() {
                   >
                     <TrashIcon />
                   </button>
+                  </div>
                 </div>
                 <span className="backlog-meta">
                   {daysLabel(task.estimateDays)}

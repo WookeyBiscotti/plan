@@ -31,6 +31,8 @@ export type Task = {
   start: string | null
   /** ID work item в TFS. По нему повторный импорт обновляет задачу, а не создаёт дубль. */
   tfsId?: number
+  /** Прямая ссылка на work item в TFS. */
+  tfsUrl?: string
   /** Поля work item на момент последнего импорта из TFS. */
   tfsFields?: Record<string, unknown>
   /** Блокеры вне импортированной группы подзадач. */

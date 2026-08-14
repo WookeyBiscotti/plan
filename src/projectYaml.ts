@@ -85,6 +85,8 @@ function parseTask(value: unknown, index: number): Task {
   }
   const tfsId = readOptionalNumber(value.tfsId)
   if (tfsId != null) task.tfsId = tfsId
+  const tfsUrl = readOptionalString(value.tfsUrl)
+  if (tfsUrl) task.tfsUrl = tfsUrl
   if (isRecord(value.tfsFields)) task.tfsFields = value.tfsFields
   if (Array.isArray(value.externalBlockers)) {
     task.externalBlockers = value.externalBlockers.map((item, blockerIndex) =>
@@ -152,6 +154,7 @@ export function serializeProjectYaml(project: ProjectState): string {
         start: task.start,
       }
       if (task.tfsId != null) row.tfsId = task.tfsId
+      if (task.tfsUrl) row.tfsUrl = task.tfsUrl
       if (task.tfsFields && Object.keys(task.tfsFields).length > 0) row.tfsFields = task.tfsFields
       if (task.externalBlockers?.length) row.externalBlockers = task.externalBlockers
       return row

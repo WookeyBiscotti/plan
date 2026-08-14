@@ -77,21 +77,24 @@ function buildExternalBlocker(
 
 function toTask(
   item: WorkItem,
+  parentId: Id | null,
   dependsOn: Id[],
   days: number,
   assigneeId: Id | null,
   externalBlockers: ExternalBlocker[],
+  baseUrl: string,
 ): Task {
   const title = fieldText(item.fields, 'System.Title') || `Задача ${item.id}`
   const task: Task = {
     id: tfsTaskId(item.id),
     title: `#${item.id} ${title}`,
     estimateDays: days,
-    parentId: null,
+    parentId,
     assigneeId,
     dependsOn,
     start: null,
     tfsId: item.id,
+    tfsUrl: workItemWebUrl(baseUrl, item.id),
     tfsFields: { ...item.fields },
   }
   if (externalBlockers.length > 0) task.externalBlockers = externalBlockers
@@ -139,10 +142,11 @@ export function mergeImportedTasks(existing: Task[], incoming: Task[]): ImportMe
       ...(previous ?? task),
       id: localId,
       tfsId: task.tfsId ?? previous?.tfsId ?? importKey(task) ?? undefined,
+      tfsUrl: task.tfsUrl ?? previous?.tfsUrl,
       tfsFields: task.tfsFields ?? previous?.tfsFields,
       title: task.title,
       estimateDays: task.estimateDays,
-      parentId: null,
+      parentId: task.parentId ? rewrite(task.parentId) : null,
       dependsOn: task.dependsOn.map(rewrite),
       externalBlockers: task.externalBlockers ?? previous?.externalBlockers,
       start: previous?.start ?? task.start,
@@ -197,17 +201,39 @@ export function mapWorkItemsToTasks(
       tasks.push(
         toTask(
           root,
+          null,
           [],
           estimateDays(root),
           matchAssignee(people, root.fields['System.AssignedTo']),
           [],
+          baseUrl,
         ),
       )
       rootCount += 1
       continue
     }
 
+    const parentId = tfsTaskId(root.id)
     const siblingIds = new Set(childItems.map((item) => item.id))
+
+    const rootBlockerIds = extractBlockerIds(root)
+    tasks.push(
+      toTask(
+        root,
+        null,
+        rootBlockerIds
+          .filter((id) => siblingIds.has(id) && id !== root.id)
+          .map(tfsTaskId),
+        estimateDays(root),
+        matchAssignee(people, root.fields['System.AssignedTo']),
+        rootBlockerIds
+          .filter((id) => !siblingIds.has(id))
+          .map((id) => buildExternalBlocker(id, byId, baseUrl)),
+        baseUrl,
+      ),
+    )
+    rootCount += 1
+
     for (const child of childItems) {
       const blockerIds = extractBlockerIds(child)
       const dependsOn = blockerIds
@@ -219,10 +245,12 @@ export function mapWorkItemsToTasks(
       tasks.push(
         toTask(
           child,
+          parentId,
           dependsOn,
           estimateDays(child),
           matchAssignee(people, child.fields['System.AssignedTo']),
           externalBlockers,
+          baseUrl,
         ),
       )
       childCount += 1

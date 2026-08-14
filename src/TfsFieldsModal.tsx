@@ -5,6 +5,7 @@ import {
   isLongField,
   listFieldEntries,
 } from './tfsFieldView'
+import { TfsLink } from './TfsLink'
 import type { Task } from './types'
 
 type TfsFieldsModalProps = {
@@ -39,9 +40,12 @@ export function TfsFieldsModal({ task, onClose }: TfsFieldsModalProps) {
               #{id} {title !== '—' ? title : task.title.replace(/^#\d+\s*/, '')}
             </h2>
           </div>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Закрыть">
-            ×
-          </button>
+          <div className="tfs-modal-head-actions">
+            <TfsLink task={task} />
+            <button type="button" className="icon-btn" onClick={onClose} aria-label="Закрыть">
+              ×
+            </button>
+          </div>
         </header>
 
         <div className="tfs-fields">

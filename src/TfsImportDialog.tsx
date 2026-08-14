@@ -116,7 +116,7 @@ export function TfsImportDialog() {
         if (updated > 0) parts.push(`обновлено ${updated}`)
         const detail =
           mapped.childCount > 0
-            ? `${mapped.childCount} подзадач`
+            ? `${mapped.rootCount} основных, ${mapped.childCount} подзадач`
             : `${mapped.rootCount} задач`
         setInfo(`${parts.join(', ')}: ${detail}`)
       }
@@ -135,8 +135,8 @@ export function TfsImportDialog() {
       {open && (
         <form className="team-pop tfs-pop" onSubmit={onSubmit}>
           <p className="team-pop-lead">
-            Задачи выбранного типа из Area Path. Если у задачи есть Child — в план попадут только
-            подзадачи со связями Blocked By; родитель не импортируется.
+            Задачи выбранного типа из Area Path. Если у задачи есть Child — импортируются
+            родитель и подзадачи со связями Blocked By между ними.
           </p>
 
           <label>

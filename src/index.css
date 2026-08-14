@@ -351,6 +351,13 @@ ul {
   font-weight: 500;
 }
 
+.backlog-card-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .backlog-trash {
   flex: none;
   display: grid;
@@ -783,6 +790,25 @@ ul {
   border-color: #d06a32;
 }
 
+.tfs-link-inline {
+  flex: none;
+  font-size: 9px;
+  padding: 1px 4px;
+}
+
+.chip-with-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.chip-with-link .chip {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .root-deps {
   margin-top: 0;
 }
@@ -883,6 +909,13 @@ ul {
   align-items: flex-start;
   padding: 18px 20px 14px;
   border-bottom: 1px solid rgba(232, 220, 200, 0.1);
+}
+
+.tfs-modal-head-actions {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  flex: none;
 }
 
 .tfs-modal-head h2 {
