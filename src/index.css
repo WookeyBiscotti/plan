@@ -692,6 +692,26 @@ ul {
   border: 1px solid rgba(232, 220, 200, 0.28);
   color: #ebe4d6;
   font-size: 12px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.epic-bar.is-moving {
+  cursor: grabbing;
+}
+
+.epic-ghost {
+  z-index: 0;
+  background: rgba(232, 220, 200, 0.12);
+  border: 1px dashed rgba(232, 220, 200, 0.35);
+  pointer-events: none;
+}
+
+.epic-ghost.is-moving {
+  z-index: 2;
+  background: rgba(208, 106, 50, 0.18);
+  border-color: rgba(208, 106, 50, 0.55);
 }
 
 .epic-bar em {

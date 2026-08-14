@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type DragEvent, type MouseEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent, type PointerEvent } from 'react'
 import {
   daysLabel,
   formatDay,
@@ -70,22 +70,11 @@ function barStyle(days: Date[], start: string, end: string) {
   }
 }
 
-function epicSpan(
-  task: Task,
-  stats: EpicStats | undefined,
-  placements: Record<Id, Placement>,
-): { start: string; end: string } | null {
-  const start = stats?.start ?? task.start
-  if (!start) return null
-
-  const end =
-    stats?.finish ??
-    placements[task.id]?.end ??
-    workDates(parseISO(start), Math.max(1, task.estimateDays)).at(-1) ??
-    null
+function epicSpan(task: Task): { start: string; end: string } | null {
+  if (!task.start) return null
+  const end = workDates(parseISO(task.start), Math.max(1, task.estimateDays)).at(-1)
   if (!end) return null
-
-  return { start, end }
+  return { start: task.start, end }
 }
 
 function personById(people: Person[], id: Id | null) {
@@ -101,11 +90,15 @@ export function Timeline() {
     setHover,
     setDraggingId,
     place,
+    moveEpicStart,
     setSelectedId,
     selectedId,
   } = usePlan()
   const rootSelected = useRootSelected()
   const scroller = useRef<HTMLDivElement>(null)
+  const epicBodies = useRef<Map<number, HTMLElement>>(new Map())
+  const [epicHoverDate, setEpicHoverDate] = useState<string | null>(null)
+  const [epicMove, setEpicMove] = useState<{ taskId: Id; date: string } | null>(null)
   const days = useMemo(() => rangeDays(state.planStart, TIMELINE_DAYS), [state.planStart])
   const today = todayISO()
   const todayIndex = days.findIndex((d) => toISO(d) === today)
@@ -118,7 +111,18 @@ export function Timeline() {
   }, [todayIndex])
 
   const dragging = state.tasks.find((t) => t.id === draggingId) ?? null
+  const draggingRoot = dragging && dragging.parentId === null ? dragging : null
   const ghost = hover && dragging ? workDates(parseISO(hover.date), dragging.estimateDays) : null
+  const epicGhostDates =
+    epicHoverDate && draggingRoot
+      ? workDates(parseISO(epicHoverDate), draggingRoot.estimateDays)
+      : null
+  const epicMoveDates = epicMove
+    ? workDates(
+        parseISO(epicMove.date),
+        Math.max(1, state.tasks.find((t) => t.id === epicMove.taskId)?.estimateDays ?? 1),
+      )
+    : null
 
   const monthGroups = useMemo(() => {
     const groups: { label: string; count: number }[] = []
@@ -140,12 +144,79 @@ export function Timeline() {
     const items: EpicItem[] = []
     for (const task of epicTasks) {
       const stats = schedule.stats[task.id]
-      const span = epicSpan(task, stats, schedule.placements)
+      const span = epicSpan(task)
       if (!span) continue
       items.push({ task, span, stats })
     }
     return assignEpicRows(items)
-  }, [state.tasks, schedule.placements, schedule.stats])
+  }, [state.tasks, schedule.stats])
+
+  useEffect(() => {
+    if (!draggingId) setEpicHoverDate(null)
+  }, [draggingId])
+
+  useEffect(() => {
+    if (!epicMove) return
+
+    function onPointerMove(event: globalThis.PointerEvent) {
+      const bodies = [...epicBodies.current.values()]
+      const body = bodies.find((node) => {
+        const rect = node.getBoundingClientRect()
+        return event.clientX >= rect.left && event.clientX <= rect.right
+      })
+      if (!body) return
+      setEpicMove((prev) =>
+        prev ? { ...prev, date: dateFromPoint(body, event.clientX, days) } : null,
+      )
+    }
+
+    function onPointerUp() {
+      setEpicMove((prev) => {
+        if (prev) moveEpicStart(prev.taskId, prev.date)
+        return null
+      })
+    }
+
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', onPointerUp)
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', onPointerUp)
+    }
+  }, [epicMove, days, moveEpicStart])
+
+  function epicDateFromEvent(event: DragEvent<HTMLElement> | React.DragEvent<HTMLElement>) {
+    const body = event.currentTarget
+    return dateFromPoint(body, event.clientX, days)
+  }
+
+  function onEpicDragOver(event: DragEvent<HTMLElement>) {
+    if (!draggingRoot) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    setEpicHoverDate(epicDateFromEvent(event))
+  }
+
+  function onEpicDrop(event: DragEvent<HTMLElement>) {
+    event.preventDefault()
+    const id = event.dataTransfer.getData('text/plain') || draggingId
+    if (!id) return
+    const task = state.tasks.find((t) => t.id === id)
+    if (!task || task.parentId) return
+    const date = epicDateFromEvent(event)
+    const personId = task.assigneeId ?? state.people[0]?.id
+    if (!personId) return
+    place(id, personId, date)
+    setEpicHoverDate(null)
+  }
+
+  function beginEpicMove(event: PointerEvent<HTMLButtonElement>, taskId: Id, start: string) {
+    if (event.button !== 0) return
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setEpicMove({ taskId, date: start })
+    setSelectedId(taskId)
+  }
 
   function onLaneDrag(event: DragEvent<HTMLElement>, personId: Id) {
     event.preventDefault()
@@ -204,13 +275,41 @@ export function Timeline() {
         {(epicRows.length > 0 ? epicRows : [[]]).map((row, rowIndex) => (
           <div key={rowIndex} className="epics">
             <div className="lane-label">{rowIndex === 0 ? 'Эпики' : ''}</div>
-            <div className="lane-body epics-body" style={{ width, height: EPIC_ROW_H }}>
+            <div
+              className="lane-body epics-body"
+              style={{ width, height: EPIC_ROW_H }}
+              ref={(node) => {
+                if (node) epicBodies.current.set(rowIndex, node)
+                else epicBodies.current.delete(rowIndex)
+              }}
+              onDragOver={onEpicDragOver}
+              onDragLeave={() => setEpicHoverDate(null)}
+              onDrop={onEpicDrop}
+            >
               {days.map((day) => (
                 <span
                   key={toISO(day)}
                   className={`grid-cell${isWeekend(day) ? ' is-weekend' : ''}${toISO(day) === today ? ' is-today' : ''}`}
                 />
               ))}
+              {epicGhostDates && (
+                <div
+                  className="ghost-bar epic-ghost"
+                  style={
+                    barStyle(days, epicGhostDates[0], epicGhostDates[epicGhostDates.length - 1]) ??
+                    undefined
+                  }
+                />
+              )}
+              {epicMoveDates && row.some(({ task }) => task.id === epicMove?.taskId) && (
+                <div
+                  className="ghost-bar epic-ghost is-moving"
+                  style={
+                    barStyle(days, epicMoveDates[0], epicMoveDates[epicMoveDates.length - 1]) ??
+                    undefined
+                  }
+                />
+              )}
               {row.map(({ task, span, stats }) => {
                 const box = barStyle(days, span.start, span.end)
                 if (!box) return null
@@ -219,11 +318,13 @@ export function Timeline() {
                   <button
                     key={task.id}
                     type="button"
-                    draggable
-                    className={`epic-bar${rootSelected === task.id ? ' is-selected' : ''}`}
-                    style={{ left: box.left, width: box.width }}
-                    onDragStart={(e) => startDrag(e, task.id)}
-                    onDragEnd={() => setDraggingId(null)}
+                    className={`epic-bar${rootSelected === task.id ? ' is-selected' : ''}${epicMove?.taskId === task.id ? ' is-moving' : ''}`}
+                    style={{
+                      left: box.left,
+                      width: box.width,
+                      opacity: epicMove?.taskId === task.id ? 0.35 : 1,
+                    }}
+                    onPointerDown={(e) => beginEpicMove(e, task.id, span.start)}
                     onClick={() => setSelectedId(task.id)}
                   >
                     <span>{task.title}</span>

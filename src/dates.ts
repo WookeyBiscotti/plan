@@ -58,6 +58,32 @@ export function workDaysInclusive(start: Date, end: Date): number {
   return n
 }
 
+/** Смещение в рабочих днях от `fromIso` до `toIso` (отрицательное — назад). */
+export function workDayOffset(fromIso: string, toIso: string): number {
+  if (fromIso === toIso) return 0
+  const forward = fromIso <= toIso
+  let d = parseISO(fromIso)
+  const target = toIso
+  let count = 0
+  while (toISO(d) !== target) {
+    d = addDays(d, forward ? 1 : -1)
+    if (!isWeekend(d)) count += forward ? 1 : -1
+  }
+  return count
+}
+
+export function shiftWorkDays(iso: string, delta: number): string {
+  if (delta === 0) return iso
+  let d = parseISO(iso)
+  let left = Math.abs(delta)
+  const step = delta > 0 ? 1 : -1
+  while (left > 0) {
+    d = addDays(d, step)
+    if (!isWeekend(d)) left -= 1
+  }
+  return toISO(d)
+}
+
 export function mondayOnOrBefore(iso: string): string {
   const d = parseISO(iso)
   const offset = (d.getDay() + 6) % 7

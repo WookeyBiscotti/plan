@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useReducer, useState, type ReactNode } from 'react'
 import { createContext, useCallback, useContext } from 'react'
 import { buildSchedule, rootIdOf, wouldCycle } from './schedule'
+import { shiftWorkDays, workDayOffset } from './dates'
 import { createEmptyProject, createSeed, PEOPLE_COLORS } from './seed'
 import { mergeImportedTasks } from './tfsImport'
 import type { Id, ProjectState, ScheduleResult, Task } from './types'
@@ -24,6 +25,7 @@ function loadState(): ProjectState {
 type Action =
   | { type: 'add-backlog'; title: string; estimateDays: number }
   | { type: 'place'; taskId: Id; personId: Id; date: string }
+  | { type: 'move-epic'; taskId: Id; date: string }
   | { type: 'unplace'; taskId: Id }
   | { type: 'patch'; taskId: Id; patch: Partial<Task> }
   | { type: 'add-subtask'; parentId: Id }
@@ -68,6 +70,22 @@ function reducer(state: ProjectState, action: Action): ProjectState {
           }
           if (hasKids && task.parentId === action.taskId && !task.assigneeId) {
             return { ...task, assigneeId: action.personId }
+          }
+          return task
+        }),
+      }
+    }
+    case 'move-epic': {
+      const root = state.tasks.find((t) => t.id === action.taskId)
+      if (!root?.start) return state
+      const delta = workDayOffset(root.start, action.date)
+      if (delta === 0) return state
+      return {
+        ...state,
+        tasks: state.tasks.map((task) => {
+          if (task.id === action.taskId) return { ...task, start: action.date }
+          if (task.parentId === action.taskId && task.start) {
+            return { ...task, start: shiftWorkDays(task.start, delta) }
           }
           return task
         }),
@@ -211,6 +229,7 @@ type Store = {
   setHover: (hover: HoverCell | null) => void
   addBacklog: (title: string, estimateDays: number) => void
   place: (taskId: Id, personId: Id, date: string) => void
+  moveEpicStart: (taskId: Id, date: string) => void
   unplace: (taskId: Id) => void
   patch: (taskId: Id, patch: Partial<Task>) => void
   addSubtask: (parentId: Id) => void
@@ -248,6 +267,11 @@ export function PlanProvider({ children }: { children: ReactNode }) {
     setSelectedId(taskId)
     setDraggingId(null)
     setHover(null)
+  }, [])
+
+  const moveEpicStart = useCallback((taskId: Id, date: string) => {
+    dispatch({ type: 'move-epic', taskId, date })
+    setSelectedId(taskId)
   }, [])
 
   const unplace = useCallback((taskId: Id) => {
@@ -323,6 +347,7 @@ export function PlanProvider({ children }: { children: ReactNode }) {
       setHover,
       addBacklog,
       place,
+      moveEpicStart,
       unplace,
       patch,
       addSubtask,
@@ -344,6 +369,7 @@ export function PlanProvider({ children }: { children: ReactNode }) {
       hover,
       addBacklog,
       place,
+      moveEpicStart,
       unplace,
       patch,
       addSubtask,
