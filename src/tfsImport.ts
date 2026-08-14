@@ -1,5 +1,5 @@
-import { extractBlockerIds, extractChildIds, type WorkItem } from './tfsApi'
-import type { Id, Person, Task } from './types'
+import { extractBlockerIds, extractChildIds, workItemWebUrl, type WorkItem } from './tfsApi'
+import type { ExternalBlocker, Id, Person, Task } from './types'
 
 export const TFS_ID_PREFIX = 'tfs-'
 
@@ -61,19 +61,41 @@ function matchAssignee(people: Person[], assignedTo: unknown): Id | null {
   return fuzzy?.id ?? null
 }
 
-function toTask(item: WorkItem, parentId: Id | null, dependsOn: Id[], days: number, assigneeId: Id | null): Task {
-  const title = fieldText(item.fields, 'System.Title') || `Задача ${item.id}`
+function buildExternalBlocker(
+  id: number,
+  byId: Map<number, WorkItem>,
+  baseUrl: string,
+): ExternalBlocker {
+  const item = byId.get(id)
+  const rawTitle = item ? fieldText(item.fields, 'System.Title') : ''
   return {
+    tfsId: id,
+    title: rawTitle ? `#${id} ${rawTitle}` : `#${id}`,
+    url: workItemWebUrl(baseUrl, id),
+  }
+}
+
+function toTask(
+  item: WorkItem,
+  dependsOn: Id[],
+  days: number,
+  assigneeId: Id | null,
+  externalBlockers: ExternalBlocker[],
+): Task {
+  const title = fieldText(item.fields, 'System.Title') || `Задача ${item.id}`
+  const task: Task = {
     id: tfsTaskId(item.id),
     title: `#${item.id} ${title}`,
     estimateDays: days,
-    parentId,
+    parentId: null,
     assigneeId,
     dependsOn,
     start: null,
     tfsId: item.id,
     tfsFields: { ...item.fields },
   }
+  if (externalBlockers.length > 0) task.externalBlockers = externalBlockers
+  return task
 }
 
 export function importKey(task: Task): number | null {
@@ -120,11 +142,13 @@ export function mergeImportedTasks(existing: Task[], incoming: Task[]): ImportMe
       tfsFields: task.tfsFields ?? previous?.tfsFields,
       title: task.title,
       estimateDays: task.estimateDays,
-      parentId: task.parentId ? rewrite(task.parentId) : null,
+      parentId: null,
       dependsOn: task.dependsOn.map(rewrite),
+      externalBlockers: task.externalBlockers ?? previous?.externalBlockers,
       start: previous?.start ?? task.start,
       assigneeId: previous?.assigneeId ?? task.assigneeId,
     }
+    if (!merged.externalBlockers?.length) delete merged.externalBlockers
     mergedByLocalId.set(localId, merged)
     if (previous) updated += 1
     else added += 1
@@ -158,6 +182,7 @@ export function mapWorkItemsToTasks(
   roots: WorkItem[],
   byId: Map<number, WorkItem>,
   people: Person[],
+  baseUrl: string,
 ): TfsImportResult {
   const tasks: Task[] = []
   let rootCount = 0
@@ -170,28 +195,34 @@ export function mapWorkItemsToTasks(
 
     if (childItems.length === 0) {
       tasks.push(
-        toTask(root, null, [], estimateDays(root), matchAssignee(people, root.fields['System.AssignedTo'])),
+        toTask(
+          root,
+          [],
+          estimateDays(root),
+          matchAssignee(people, root.fields['System.AssignedTo']),
+          [],
+        ),
       )
       rootCount += 1
       continue
     }
 
     const siblingIds = new Set(childItems.map((item) => item.id))
-    const parentEstimate = childItems.reduce((sum, item) => sum + estimateDays(item), 0)
-    tasks.push(toTask(root, null, [], Math.max(1, parentEstimate), null))
-    rootCount += 1
-
     for (const child of childItems) {
-      const dependsOn = extractBlockerIds(child)
+      const blockerIds = extractBlockerIds(child)
+      const dependsOn = blockerIds
         .filter((id) => siblingIds.has(id) && id !== child.id)
         .map(tfsTaskId)
+      const externalBlockers = blockerIds
+        .filter((id) => !siblingIds.has(id))
+        .map((id) => buildExternalBlocker(id, byId, baseUrl))
       tasks.push(
         toTask(
           child,
-          tfsTaskId(root.id),
           dependsOn,
           estimateDays(child),
           matchAssignee(people, child.fields['System.AssignedTo']),
+          externalBlockers,
         ),
       )
       childCount += 1
@@ -199,4 +230,8 @@ export function mapWorkItemsToTasks(
   }
 
   return { tasks, rootCount, childCount }
+}
+
+export function hasExternalBlockers(task: Task): boolean {
+  return (task.externalBlockers?.length ?? 0) > 0
 }

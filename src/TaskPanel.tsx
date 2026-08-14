@@ -3,6 +3,7 @@ import { daysLabel, formatDayMonth } from './dates'
 import { wouldCycle } from './schedule'
 import { usePlan, useRootSelected } from './store'
 import { TfsFieldsModal } from './TfsFieldsModal'
+import { ExternalBlockersList } from './ExternalBlockersList'
 import { hasTfsFields } from './tfsFieldView'
 import type { Id, Task } from './types'
 
@@ -88,6 +89,30 @@ export function TaskPanel() {
           <em>рабочих дней, пока не разложили</em>
         </span>
       </label>
+
+      {root.externalBlockers && root.externalBlockers.length > 0 && (
+        <ExternalBlockersList blockers={root.externalBlockers} />
+      )}
+
+      {root.dependsOn.length > 0 && (
+        <div className="deps root-deps">
+          <span>ждёт</span>
+          {root.dependsOn.map((depId) => {
+            const dep = state.tasks.find((task) => task.id === depId)
+            if (!dep) return null
+            return (
+              <button
+                key={depId}
+                type="button"
+                className="chip is-on"
+                onClick={() => setSelectedId(depId)}
+              >
+                {dep.title}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {stats && placed && (
         <div className={`metrics${stats.savedDays > 0 ? ' has-save' : ''}${stats.cycle ? ' is-bad' : ''}`}>
@@ -272,6 +297,9 @@ function SubtaskRow({
         <p className="sub-dates">
           {formatDayMonth(placement.start)} → {formatDayMonth(placement.end)}
         </p>
+      )}
+      {task.externalBlockers && task.externalBlockers.length > 0 && (
+        <ExternalBlockersList blockers={task.externalBlockers} />
       )}
       <div className="deps">
         <span>ждёт</span>

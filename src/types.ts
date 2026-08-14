@@ -7,6 +7,13 @@ export type Person = {
   color: string
 }
 
+/** Блокер из TFS, не импортированный в план (вне группы Child). */
+export type ExternalBlocker = {
+  tfsId: number
+  title: string
+  url: string
+}
+
 export type Task = {
   id: Id
   title: string
@@ -26,6 +33,8 @@ export type Task = {
   tfsId?: number
   /** Поля work item на момент последнего импорта из TFS. */
   tfsFields?: Record<string, unknown>
+  /** Блокеры вне импортированной группы подзадач. */
+  externalBlockers?: ExternalBlocker[]
 }
 
 export type ProjectState = {

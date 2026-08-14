@@ -122,6 +122,10 @@ export async function fetchWorkItemsBatch(config: TfsConfig, ids: number[]): Pro
   return items.sort((a, b) => a.id - b.id)
 }
 
+export function workItemWebUrl(baseUrl: string, id: number): string {
+  return `${normalizeBaseUrl(baseUrl)}/_workitems/edit/${id}`
+}
+
 export function workItemIdFromUrl(url: string): number | null {
   const httpsMatch = /\/workItems\/(\d+)(?:\?|$)/i.exec(url)
   if (httpsMatch) return Number.parseInt(httpsMatch[1], 10)
@@ -174,6 +178,17 @@ export async function loadWorkItemsForImport(
   if (missing.size > 0) {
     const children = await fetchWorkItemsBatch(config, [...missing])
     for (const child of children) byId.set(child.id, child)
+  }
+
+  const missingBlockers = new Set<number>()
+  for (const item of byId.values()) {
+    for (const blockerId of extractBlockerIds(item)) {
+      if (!byId.has(blockerId)) missingBlockers.add(blockerId)
+    }
+  }
+  if (missingBlockers.size > 0) {
+    const blockers = await fetchWorkItemsBatch(config, [...missingBlockers])
+    for (const blocker of blockers) byId.set(blocker.id, blocker)
   }
 
   const queriedIds = new Set(queried.map((item) => item.id))

@@ -12,8 +12,9 @@ import {
   workDates,
 } from './dates'
 import { usePlan, useRootSelected } from './store'
-import { TrashIcon } from './icons'
+import { TrashIcon, LockIcon } from './icons'
 import type { EpicStats, Id, Person, Placement, Task } from './types'
+import { hasExternalBlockers } from './tfsImport'
 
 export const DAY_W = 34
 export const LABEL_W = 176
@@ -379,12 +380,13 @@ function Lane({
           const color = personById(people, placement.assigneeId)?.color ?? person.color
           const isCrit = critical.includes(task.id)
           const inEpic = rootSelected && (task.id === rootSelected || task.parentId === rootSelected)
+          const locked = hasExternalBlockers(task)
           return (
             <button
               key={task.id}
               type="button"
               draggable
-              className={`task-bar${selectedId === task.id ? ' is-selected' : ''}${isCrit ? ' is-critical' : ''}${rootSelected && !inEpic ? ' is-dim' : ''}`}
+              className={`task-bar${selectedId === task.id ? ' is-selected' : ''}${isCrit ? ' is-critical' : ''}${rootSelected && !inEpic ? ' is-dim' : ''}${locked ? ' has-lock' : ''}`}
               style={{
                 left: box.left,
                 width: box.width,
@@ -396,9 +398,10 @@ function Lane({
                 e.stopPropagation()
                 onSelect(task.id)
               }}
-              title={`${task.title} · ${placement.start} → ${placement.end}`}
+              title={`${task.title} · ${placement.start} → ${placement.end}${locked ? ' · есть внешние блокеры' : ''}`}
             >
-              {task.title}
+              <span className="task-bar-label">{task.title}</span>
+              {locked && <LockIcon className="task-lock" />}
             </button>
           )
         })}

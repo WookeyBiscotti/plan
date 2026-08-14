@@ -12,3 +12,23 @@ export function TrashIcon() {
     </svg>
   )
 }
+
+export function LockIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="12"
+      height="12"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M4.5 7V5.5a3.5 3.5 0 0 1 7 0V7M4 7h8v6.5H4V7Z"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}

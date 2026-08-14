@@ -106,7 +106,7 @@ export function TfsImportDialog() {
         states,
         roadmapStates,
       })
-      const mapped = mapWorkItemsToTasks(roots, byId, state.people)
+      const mapped = mapWorkItemsToTasks(roots, byId, state.people, config.baseUrl)
       const { added, updated } = importTasks(mapped.tasks)
       if (mapped.tasks.length === 0) {
         setInfo('По заданным фильтрам задач не найдено.')
@@ -114,9 +114,11 @@ export function TfsImportDialog() {
         const parts: string[] = []
         if (added > 0) parts.push(`добавлено ${added}`)
         if (updated > 0) parts.push(`обновлено ${updated}`)
-        setInfo(
-          `${parts.join(', ')}: ${mapped.rootCount} основных, ${mapped.childCount} подзадач`,
-        )
+        const detail =
+          mapped.childCount > 0
+            ? `${mapped.childCount} подзадач`
+            : `${mapped.rootCount} задач`
+        setInfo(`${parts.join(', ')}: ${detail}`)
       }
     } catch (exc) {
       setError(exc instanceof Error ? exc.message : String(exc))
@@ -133,8 +135,8 @@ export function TfsImportDialog() {
       {open && (
         <form className="team-pop tfs-pop" onSubmit={onSubmit}>
           <p className="team-pop-lead">
-            Задачи выбранного типа из Area Path. Если у задачи есть Child — она считается
-            декомпозированной, подзадачи и связи Blocked By тоже попадут в план.
+            Задачи выбранного типа из Area Path. Если у задачи есть Child — в план попадут только
+            подзадачи со связями Blocked By; родитель не импортируется.
           </p>
 
           <label>

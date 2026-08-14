@@ -1,6 +1,6 @@
 import { parse, stringify } from 'yaml'
 import { mondayOnOrBefore, todayISO } from './dates'
-import type { Id, Person, ProjectState, Task } from './types'
+import type { Id, Person, ProjectState, Task, ExternalBlocker } from './types'
 
 export const PROJECT_YAML_VERSION = 1
 
@@ -61,6 +61,17 @@ function parsePerson(value: unknown, index: number): Person {
   }
 }
 
+function parseExternalBlocker(value: unknown, index: number, taskIndex: number): ExternalBlocker {
+  if (!isRecord(value)) {
+    throw new Error(`tasks[${taskIndex}].externalBlockers[${index}]: ожидается объект`)
+  }
+  return {
+    tfsId: readNumber(value.tfsId, `tasks[${taskIndex}].externalBlockers[${index}].tfsId`),
+    title: readString(value.title, `tasks[${taskIndex}].externalBlockers[${index}].title`),
+    url: readString(value.url, `tasks[${taskIndex}].externalBlockers[${index}].url`),
+  }
+}
+
 function parseTask(value: unknown, index: number): Task {
   if (!isRecord(value)) throw new Error(`tasks[${index}]: ожидается объект`)
   const task: Task = {
@@ -75,6 +86,11 @@ function parseTask(value: unknown, index: number): Task {
   const tfsId = readOptionalNumber(value.tfsId)
   if (tfsId != null) task.tfsId = tfsId
   if (isRecord(value.tfsFields)) task.tfsFields = value.tfsFields
+  if (Array.isArray(value.externalBlockers)) {
+    task.externalBlockers = value.externalBlockers.map((item, blockerIndex) =>
+      parseExternalBlocker(item, blockerIndex, index),
+    )
+  }
   return task
 }
 
@@ -137,6 +153,7 @@ export function serializeProjectYaml(project: ProjectState): string {
       }
       if (task.tfsId != null) row.tfsId = task.tfsId
       if (task.tfsFields && Object.keys(task.tfsFields).length > 0) row.tfsFields = task.tfsFields
+      if (task.externalBlockers?.length) row.externalBlockers = task.externalBlockers
       return row
     }),
   }
