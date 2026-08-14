@@ -3,14 +3,7 @@ import { daysLabel } from './dates'
 import { TrashIcon } from './icons'
 import { TfsLink } from './TfsLink'
 import { usePlan } from './store'
-
-function matchesFilter(title: string, tfsId: number | undefined, query: string): boolean {
-  const needle = query.trim().toLowerCase()
-  if (!needle) return true
-  if (title.toLowerCase().includes(needle)) return true
-  if (tfsId != null && String(tfsId).includes(needle)) return true
-  return false
-}
+import { matchesTaskSearch } from './taskFilter'
 
 export function Backlog() {
   const { state, schedule, addBacklog, unplace, remove, setDraggingId, setSelectedId, selectedId } =
@@ -25,7 +18,7 @@ export function Backlog() {
   )
 
   const visible = useMemo(
-    () => items.filter((task) => matchesFilter(task.title, task.tfsId, filter)),
+    () => items.filter((task) => matchesTaskSearch(task, filter)),
     [items, filter],
   )
 
@@ -67,7 +60,7 @@ export function Backlog() {
             <input
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              placeholder="Название или ID"
+              placeholder="Название, ID или State: значение"
             />
           </label>
         )}
