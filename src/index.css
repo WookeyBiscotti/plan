@@ -636,6 +636,10 @@ ul {
   background: rgba(232, 220, 200, 0.04);
 }
 
+.epics + .epics {
+  border-top: 1px solid rgba(232, 220, 200, 0.06);
+}
+
 .epics-body,
 .lane-body {
   background: #131210;

@@ -18,7 +18,38 @@ import type { EpicStats, Id, Person, Placement, Task } from './types'
 export const DAY_W = 34
 export const LABEL_W = 176
 export const LANE_H = 56
+export const EPIC_ROW_H = 44
 const TIMELINE_DAYS = 70
+
+type EpicItem = {
+  task: Task
+  span: { start: string; end: string }
+  stats?: EpicStats
+}
+
+function spansOverlap(a: { start: string; end: string }, b: { start: string; end: string }): boolean {
+  return a.start <= b.end && b.start <= a.end
+}
+
+function assignEpicRows(items: EpicItem[]): EpicItem[][] {
+  if (items.length === 0) return []
+
+  const sorted = [...items].sort(
+    (a, b) => a.span.start.localeCompare(b.span.start) || a.task.id.localeCompare(b.task.id),
+  )
+  const rows: EpicItem[][] = []
+
+  for (const item of sorted) {
+    let row = rows.find((lane) => lane.every((other) => !spansOverlap(item.span, other.span)))
+    if (!row) {
+      row = []
+      rows.push(row)
+    }
+    row.push(item)
+  }
+
+  return rows
+}
 
 function dateFromPoint(body: HTMLElement, clientX: number, days: Date[]): string {
   const rect = body.getBoundingClientRect()
@@ -99,9 +130,20 @@ export function Timeline() {
   }, [days])
 
   const leafPlacements = Object.values(schedule.placements)
-  const epics = state.tasks.filter(
-    (t) => t.parentId === null && t.start && state.tasks.some((c) => c.parentId === t.id),
-  )
+
+  const epicRows = useMemo(() => {
+    const epicTasks = state.tasks.filter(
+      (t) => t.parentId === null && t.start && state.tasks.some((c) => c.parentId === t.id),
+    )
+    const items: EpicItem[] = []
+    for (const task of epicTasks) {
+      const stats = schedule.stats[task.id]
+      const span = epicSpan(task, stats, schedule.placements)
+      if (!span) continue
+      items.push({ task, span, stats })
+    }
+    return assignEpicRows(items)
+  }, [state.tasks, schedule.placements, schedule.stats])
 
   function onLaneDrag(event: DragEvent<HTMLElement>, personId: Id) {
     event.preventDefault()
@@ -157,44 +199,43 @@ export function Timeline() {
           </div>
         </div>
 
-        <div className="epics">
-          <div className="lane-label">Эпики</div>
-          <div className="lane-body epics-body" style={{ width, height: 44 }}>
-            {days.map((day) => (
-              <span
-                key={toISO(day)}
-                className={`grid-cell${isWeekend(day) ? ' is-weekend' : ''}${toISO(day) === today ? ' is-today' : ''}`}
-              />
-            ))}
-            {epics.map((task) => {
-              const stats = schedule.stats[task.id]
-              const span = epicSpan(task, stats, schedule.placements)
-              if (!span) return null
-              const box = barStyle(days, span.start, span.end)
-              if (!box) return null
-              const kids = state.tasks.filter((t) => t.parentId === task.id)
-              return (
-                <button
-                  key={task.id}
-                  type="button"
-                  draggable
-                  className={`epic-bar${rootSelected === task.id ? ' is-selected' : ''}`}
-                  style={{ left: box.left, width: box.width }}
-                  onDragStart={(e) => startDrag(e, task.id)}
-                  onDragEnd={() => setDraggingId(null)}
-                  onClick={() => setSelectedId(task.id)}
-                >
-                  <span>{task.title}</span>
-                  <em>
-                    {kids.length > 0 && stats
-                      ? `${stats.spanDays}д / ${stats.sumParts}д`
-                      : daysLabel(task.estimateDays)}
-                  </em>
-                </button>
-              )
-            })}
+        {(epicRows.length > 0 ? epicRows : [[]]).map((row, rowIndex) => (
+          <div key={rowIndex} className="epics">
+            <div className="lane-label">{rowIndex === 0 ? 'Эпики' : ''}</div>
+            <div className="lane-body epics-body" style={{ width, height: EPIC_ROW_H }}>
+              {days.map((day) => (
+                <span
+                  key={toISO(day)}
+                  className={`grid-cell${isWeekend(day) ? ' is-weekend' : ''}${toISO(day) === today ? ' is-today' : ''}`}
+                />
+              ))}
+              {row.map(({ task, span, stats }) => {
+                const box = barStyle(days, span.start, span.end)
+                if (!box) return null
+                const kids = state.tasks.filter((t) => t.parentId === task.id)
+                return (
+                  <button
+                    key={task.id}
+                    type="button"
+                    draggable
+                    className={`epic-bar${rootSelected === task.id ? ' is-selected' : ''}`}
+                    style={{ left: box.left, width: box.width }}
+                    onDragStart={(e) => startDrag(e, task.id)}
+                    onDragEnd={() => setDraggingId(null)}
+                    onClick={() => setSelectedId(task.id)}
+                  >
+                    <span>{task.title}</span>
+                    <em>
+                      {kids.length > 0 && stats
+                        ? `${stats.spanDays}д / ${stats.sumParts}д`
+                        : daysLabel(task.estimateDays)}
+                    </em>
+                  </button>
+                )
+              })}
+            </div>
           </div>
-        </div>
+        ))}
 
         <div className="lanes">
           {todayIndex >= 0 && (
