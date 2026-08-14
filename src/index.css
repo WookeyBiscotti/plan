@@ -707,6 +707,117 @@ ul {
   align-items: flex-start;
 }
 
+.panel-head-actions {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  flex: none;
+}
+
+.tfs-fields-btn {
+  background: transparent;
+  border: 1px solid rgba(232, 220, 200, 0.18);
+  color: #9a9184;
+  padding: 4px 8px;
+  border-radius: 2px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.tfs-fields-btn:hover {
+  border-color: #d06a32;
+  color: #ebe4d6;
+}
+
+.tfs-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.62);
+}
+
+.tfs-modal {
+  width: min(720px, 100%);
+  max-height: min(84vh, 900px);
+  display: flex;
+  flex-direction: column;
+  background: #181614;
+  border: 1px solid rgba(232, 220, 200, 0.14);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+}
+
+.tfs-modal-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid rgba(232, 220, 200, 0.1);
+}
+
+.tfs-modal-head h2 {
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1.15;
+  margin-top: 4px;
+}
+
+.tfs-fields {
+  overflow: auto;
+  padding: 8px 20px 20px;
+  display: grid;
+  gap: 0;
+}
+
+.tfs-field {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(232, 220, 200, 0.08);
+}
+
+.tfs-field:last-child {
+  border-bottom: 0;
+}
+
+.tfs-field dt {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #9a9184;
+}
+
+.tfs-field dd {
+  margin: 0;
+  color: #ebe4d6;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tfs-field.is-long dd {
+  max-height: 160px;
+  overflow: auto;
+  padding: 8px 10px;
+  background: #131210;
+  border: 1px solid rgba(232, 220, 200, 0.08);
+  font-size: 12.5px;
+  color: #c8c0b3;
+}
+
+.subtask-hit .tfs-fields-btn {
+  margin-left: auto;
+  flex: none;
+}
+
 .panel-title {
   width: 100%;
   font-family: 'Instrument Serif', Georgia, serif;

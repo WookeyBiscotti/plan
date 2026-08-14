@@ -80,9 +80,9 @@ function buildImportWiql(query: TfsImportQuery): string {
   }
 
   if (states.length === 1) {
-    clauses.push(`[System.State] = '${escapeWiql(states[0])}'`)
+    clauses.push(`[State] = '${escapeWiql(states[0])}'`)
   } else if (states.length > 1) {
-    clauses.push(`[System.State] IN (${states.map((s) => `'${escapeWiql(s)}'`).join(', ')})`)
+    clauses.push(`[State] IN (${states.map((s) => `'${escapeWiql(s)}'`).join(', ')})`)
   }
 
   const roadmapStates = query.roadmapStates

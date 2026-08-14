@@ -72,6 +72,7 @@ function toTask(item: WorkItem, parentId: Id | null, dependsOn: Id[], days: numb
     dependsOn,
     start: null,
     tfsId: item.id,
+    tfsFields: { ...item.fields },
   }
 }
 
@@ -116,6 +117,7 @@ export function mergeImportedTasks(existing: Task[], incoming: Task[]): ImportMe
       ...(previous ?? task),
       id: localId,
       tfsId: task.tfsId ?? previous?.tfsId ?? importKey(task) ?? undefined,
+      tfsFields: task.tfsFields ?? previous?.tfsFields,
       title: task.title,
       estimateDays: task.estimateDays,
       parentId: task.parentId ? rewrite(task.parentId) : null,

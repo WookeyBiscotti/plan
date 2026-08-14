@@ -24,6 +24,8 @@ export type Task = {
   start: string | null
   /** ID work item в TFS. По нему повторный импорт обновляет задачу, а не создаёт дубль. */
   tfsId?: number
+  /** Поля work item на момент последнего импорта из TFS. */
+  tfsFields?: Record<string, unknown>
 }
 
 export type ProjectState = {

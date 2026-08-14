@@ -9,7 +9,8 @@ const QUERY_KEY = 'team-plan-tfs-query'
 type StoredQuery = {
   workItemType: string
   areaPath: string
-  status: string
+  state?: string
+  status?: string
   roadmapState: string
 }
 
@@ -30,7 +31,7 @@ export function TfsImportDialog() {
   const [pat, setPat] = useState('')
   const [workItemType, setWorkItemType] = useState('CR')
   const [areaPath, setAreaPath] = useState('')
-  const [status, setStatus] = useState('')
+  const [stateFilter, setStateFilter] = useState('')
   const [roadmapState, setRoadmapState] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -45,7 +46,7 @@ export function TfsImportDialog() {
     setPat(stored?.pat ?? '')
     setWorkItemType(query?.workItemType || 'CR')
     setAreaPath(query?.areaPath ?? '')
-    setStatus(query?.status ?? '')
+    setStateFilter(query?.state ?? query?.status ?? '')
     setRoadmapState(query?.roadmapState ?? '')
     setError('')
     setInfo('')
@@ -74,7 +75,7 @@ export function TfsImportDialog() {
     const config: TfsConfig = { baseUrl: baseUrl.trim(), pat: pat.trim() }
     const type = workItemType.trim() || 'CR'
     const area = areaPath.trim()
-    const states = parseList(status)
+    const states = parseList(stateFilter)
     const roadmapStates = parseList(roadmapState)
     if (!config.baseUrl || !config.pat) {
       setError('Укажите Base URL и Personal Access Token')
@@ -85,7 +86,7 @@ export function TfsImportDialog() {
       return
     }
     if (states.length === 0) {
-      setError('Укажите статус')
+      setError('Укажите State')
       return
     }
 
@@ -99,7 +100,7 @@ export function TfsImportDialog() {
         JSON.stringify({
           workItemType: type,
           areaPath: area,
-          status: status.trim(),
+          state: stateFilter.trim(),
           roadmapState: roadmapState.trim(),
         }),
       )
@@ -182,10 +183,10 @@ export function TfsImportDialog() {
             />
           </label>
           <label>
-            Статус
+            State
             <input
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
+              value={stateFilter}
+              onChange={(e) => setStateFilter(e.target.value)}
               placeholder="Active"
               disabled={loading}
               required

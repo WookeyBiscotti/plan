@@ -2,7 +2,18 @@ import { useState } from 'react'
 import { daysLabel, formatDayMonth } from './dates'
 import { wouldCycle } from './schedule'
 import { usePlan, useRootSelected } from './store'
+import { TfsFieldsModal } from './TfsFieldsModal'
+import { hasTfsFields } from './tfsFieldView'
 import type { Id, Task } from './types'
+
+function TfsFieldsButton({ task, onShow }: { task: Task; onShow: (task: Task) => void }) {
+  if (!hasTfsFields(task)) return null
+  return (
+    <button type="button" className="tfs-fields-btn" onClick={() => onShow(task)}>
+      Поля TFS
+    </button>
+  )
+}
 
 export function TaskPanel() {
   const { state, schedule, selectedId, setSelectedId, patch, addSubtask, remove, toggleDep, unplace } =
@@ -10,6 +21,7 @@ export function TaskPanel() {
   const rootId = useRootSelected()
   const [linking, setLinking] = useState(false)
   const [linkFrom, setLinkFrom] = useState<Id | null>(null)
+  const [fieldsTask, setFieldsTask] = useState<Task | null>(null)
 
   if (!rootId) {
     return (
@@ -44,20 +56,24 @@ export function TaskPanel() {
   }
 
   return (
-    <aside className="panel">
-      <header className="panel-head">
-        <div>
-          <p className="eyebrow">{placed ? 'В плане' : 'В бэклоге'}</p>
-          <input
-            className="panel-title"
-            value={root.title}
-            onChange={(e) => patch(root.id, { title: e.target.value })}
-          />
-        </div>
-        <button type="button" className="icon-btn" onClick={() => setSelectedId(null)} aria-label="Закрыть">
-          ×
-        </button>
-      </header>
+    <>
+      <aside className="panel">
+        <header className="panel-head">
+          <div>
+            <p className="eyebrow">{placed ? 'В плане' : 'В бэклоге'}</p>
+            <input
+              className="panel-title"
+              value={root.title}
+              onChange={(e) => patch(root.id, { title: e.target.value })}
+            />
+          </div>
+          <div className="panel-head-actions">
+            <TfsFieldsButton task={root} onShow={setFieldsTask} />
+            <button type="button" className="icon-btn" onClick={() => setSelectedId(null)} aria-label="Закрыть">
+              ×
+            </button>
+          </div>
+        </header>
 
       <label className="field">
         Грубая оценка
@@ -153,6 +169,7 @@ export function TaskPanel() {
               onRemove={remove}
               onToggleDep={toggleDep}
               onClick={() => onSubtaskClick(kid.id)}
+              onShowFields={setFieldsTask}
             />
           ))}
         </ul>
@@ -168,7 +185,9 @@ export function TaskPanel() {
           Удалить
         </button>
       </div>
-    </aside>
+      </aside>
+      <TfsFieldsModal task={fieldsTask} onClose={() => setFieldsTask(null)} />
+    </>
   )
 }
 
@@ -186,6 +205,7 @@ function SubtaskRow({
   onRemove,
   onToggleDep,
   onClick,
+  onShowFields,
 }: {
   task: Task
   siblings: Task[]
@@ -200,6 +220,7 @@ function SubtaskRow({
   onRemove: (id: Id) => void
   onToggleDep: (taskId: Id, depId: Id) => void
   onClick: () => void
+  onShowFields: (task: Task) => void
 }) {
   const others = siblings.filter((s) => s.id !== task.id)
 
@@ -216,6 +237,7 @@ function SubtaskRow({
           onChange={(e) => onPatch(task.id, { title: e.target.value })}
         />
         {critical && <span className="crit">крит.</span>}
+        <TfsFieldsButton task={task} onShow={onShowFields} />
       </div>
       <div className="subtask-row">
         <label>
