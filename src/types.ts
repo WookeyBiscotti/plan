@@ -22,6 +22,8 @@ export type Task = {
    * У подзадачи — необязательный сдвиг после перетаскивания.
    */
   start: string | null
+  /** ID work item в TFS. По нему повторный импорт обновляет задачу, а не создаёт дубль. */
+  tfsId?: number
 }
 
 export type ProjectState = {

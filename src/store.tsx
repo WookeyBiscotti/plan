@@ -2,6 +2,7 @@ import { useEffect, useMemo, useReducer, useState, type ReactNode } from 'react'
 import { createContext, useCallback, useContext } from 'react'
 import { buildSchedule, rootIdOf, wouldCycle } from './schedule'
 import { createSeed, PEOPLE_COLORS } from './seed'
+import { mergeImportedTasks } from './tfsImport'
 import type { Id, ProjectState, ScheduleResult, Task } from './types'
 
 const STORAGE_KEY = 'team-plan-v1'
@@ -178,20 +179,8 @@ function reducer(state: ProjectState, action: Action): ProjectState {
       }
     }
     case 'import-tasks': {
-      const existing = new Set(state.tasks.map((task) => task.id))
-      const incoming = action.tasks.filter((task) => !existing.has(task.id))
-      if (incoming.length === 0) return state
-      const known = new Set([...existing, ...incoming.map((task) => task.id)])
-      return {
-        ...state,
-        tasks: [
-          ...state.tasks,
-          ...incoming.map((task) => ({
-            ...task,
-            dependsOn: task.dependsOn.filter((id) => known.has(id)),
-          })),
-        ],
-      }
+      const { tasks } = mergeImportedTasks(state.tasks, action.tasks)
+      return { ...state, tasks }
     }
     case 'reset':
       return createSeed()
@@ -219,7 +208,7 @@ type Store = {
   addPerson: (name: string, role: string) => void
   patchPerson: (personId: Id, patch: { name?: string; role?: string }) => void
   removePerson: (personId: Id) => void
-  importTasks: (tasks: Task[]) => number
+  importTasks: (tasks: Task[]) => { added: number; updated: number }
   reset: () => void
 }
 
@@ -289,10 +278,9 @@ export function PlanProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const importTasks = useCallback((tasks: Task[]) => {
-    const existing = new Set(state.tasks.map((task) => task.id))
-    const added = tasks.filter((task) => !existing.has(task.id)).length
-    if (added > 0) dispatch({ type: 'import-tasks', tasks })
-    return added
+    const { added, updated } = mergeImportedTasks(state.tasks, tasks)
+    if (added > 0 || updated > 0) dispatch({ type: 'import-tasks', tasks })
+    return { added, updated }
   }, [state.tasks])
 
   const reset = useCallback(() => {

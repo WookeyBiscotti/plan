@@ -7,6 +7,7 @@ export interface TfsImportQuery {
   workItemType: string
   areaPath: string
   states: string[]
+  roadmapStates: string[]
 }
 
 export type WorkItemFields = Record<string, unknown>
@@ -82,6 +83,15 @@ function buildImportWiql(query: TfsImportQuery): string {
     clauses.push(`[System.State] = '${escapeWiql(states[0])}'`)
   } else if (states.length > 1) {
     clauses.push(`[System.State] IN (${states.map((s) => `'${escapeWiql(s)}'`).join(', ')})`)
+  }
+
+  const roadmapStates = query.roadmapStates
+  if (roadmapStates.length === 1) {
+    clauses.push(`[Roadmap State] = '${escapeWiql(roadmapStates[0])}'`)
+  } else if (roadmapStates.length > 1) {
+    clauses.push(
+      `[Roadmap State] IN (${roadmapStates.map((s) => `'${escapeWiql(s)}'`).join(', ')})`,
+    )
   }
 
   return `SELECT [System.Id] FROM WorkItems WHERE ${clauses.join(' AND ')} ORDER BY [System.Id]`

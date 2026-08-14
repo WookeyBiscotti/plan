@@ -71,7 +71,79 @@ function toTask(item: WorkItem, parentId: Id | null, dependsOn: Id[], days: numb
     assigneeId,
     dependsOn,
     start: null,
+    tfsId: item.id,
   }
+}
+
+export function importKey(task: Task): number | null {
+  if (typeof task.tfsId === 'number' && Number.isFinite(task.tfsId)) return task.tfsId
+  const match = /^tfs-(\d+)$/.exec(task.id)
+  return match ? Number.parseInt(match[1], 10) : null
+}
+
+export type ImportMergeResult = {
+  tasks: Task[]
+  added: number
+  updated: number
+}
+
+export function mergeImportedTasks(existing: Task[], incoming: Task[]): ImportMergeResult {
+  if (incoming.length === 0) return { tasks: existing, added: 0, updated: 0 }
+
+  const existingByTfs = new Map<number, Task>()
+  const existingById = new Map(existing.map((task) => [task.id, task]))
+  for (const task of existing) {
+    const key = importKey(task)
+    if (key != null) existingByTfs.set(key, task)
+  }
+
+  const incomingToLocalId = new Map<Id, Id>()
+  for (const task of incoming) {
+    const key = importKey(task)
+    const previous = (key != null ? existingByTfs.get(key) : undefined) ?? existingById.get(task.id)
+    incomingToLocalId.set(task.id, previous?.id ?? task.id)
+  }
+
+  const rewrite = (id: Id): Id => incomingToLocalId.get(id) ?? id
+  const mergedByLocalId = new Map<Id, Task>()
+  let added = 0
+  let updated = 0
+
+  for (const task of incoming) {
+    const localId = rewrite(task.id)
+    const previous = existingById.get(localId)
+    const merged: Task = {
+      ...(previous ?? task),
+      id: localId,
+      tfsId: task.tfsId ?? previous?.tfsId ?? importKey(task) ?? undefined,
+      title: task.title,
+      estimateDays: task.estimateDays,
+      parentId: task.parentId ? rewrite(task.parentId) : null,
+      dependsOn: task.dependsOn.map(rewrite),
+      start: previous?.start ?? task.start,
+      assigneeId: previous?.assigneeId ?? task.assigneeId,
+    }
+    mergedByLocalId.set(localId, merged)
+    if (previous) updated += 1
+    else added += 1
+  }
+
+  const known = new Set<Id>([...existing.map((task) => task.id), ...mergedByLocalId.keys()])
+  const next: Task[] = existing.map((task) => {
+    const merged = mergedByLocalId.get(task.id)
+    if (!merged) return task
+    mergedByLocalId.delete(task.id)
+    return { ...merged, dependsOn: merged.dependsOn.filter((id) => known.has(id)) }
+  })
+  for (const task of incoming) {
+    const localId = rewrite(task.id)
+    const leftover = mergedByLocalId.get(localId)
+    if (!leftover) continue
+    mergedByLocalId.delete(localId)
+    next.push({ ...leftover, dependsOn: leftover.dependsOn.filter((id) => known.has(id)) })
+  }
+
+  return { tasks: next, added, updated }
 }
 
 export type TfsImportResult = {

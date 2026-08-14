@@ -10,6 +10,7 @@ type StoredQuery = {
   workItemType: string
   areaPath: string
   status: string
+  roadmapState: string
 }
 
 function readJson<T>(key: string): T | null {
@@ -30,6 +31,7 @@ export function TfsImportDialog() {
   const [workItemType, setWorkItemType] = useState('CR')
   const [areaPath, setAreaPath] = useState('')
   const [status, setStatus] = useState('')
+  const [roadmapState, setRoadmapState] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
@@ -44,6 +46,7 @@ export function TfsImportDialog() {
     setWorkItemType(query?.workItemType || 'CR')
     setAreaPath(query?.areaPath ?? '')
     setStatus(query?.status ?? '')
+    setRoadmapState(query?.roadmapState ?? '')
     setError('')
     setInfo('')
   }, [open])
@@ -72,6 +75,7 @@ export function TfsImportDialog() {
     const type = workItemType.trim() || 'CR'
     const area = areaPath.trim()
     const states = parseList(status)
+    const roadmapStates = parseList(roadmapState)
     if (!config.baseUrl || !config.pat) {
       setError('Укажите Base URL и Personal Access Token')
       return
@@ -92,23 +96,29 @@ export function TfsImportDialog() {
       localStorage.setItem(CONFIG_KEY, JSON.stringify(config))
       localStorage.setItem(
         QUERY_KEY,
-        JSON.stringify({ workItemType: type, areaPath: area, status: status.trim() }),
+        JSON.stringify({
+          workItemType: type,
+          areaPath: area,
+          status: status.trim(),
+          roadmapState: roadmapState.trim(),
+        }),
       )
       const { roots, byId } = await loadWorkItemsForImport(config, {
         workItemType: type,
         areaPath: area,
         states,
+        roadmapStates,
       })
       const mapped = mapWorkItemsToTasks(roots, byId, state.people)
-      const added = importTasks(mapped.tasks)
+      const { added, updated } = importTasks(mapped.tasks)
       if (mapped.tasks.length === 0) {
         setInfo('По заданным фильтрам задач не найдено.')
-      } else if (added === 0) {
-        setInfo(`Все ${mapped.tasks.length} задач уже есть в плане.`)
       } else {
+        const parts: string[] = []
+        if (added > 0) parts.push(`добавлено ${added}`)
+        if (updated > 0) parts.push(`обновлено ${updated}`)
         setInfo(
-          `Добавлено ${added}: ${mapped.rootCount} основных, ${mapped.childCount} подзадач` +
-            (added < mapped.tasks.length ? ` · пропущено ${mapped.tasks.length - added} уже существующих` : ''),
+          `${parts.join(', ')}: ${mapped.rootCount} основных, ${mapped.childCount} подзадач`,
         )
       }
     } catch (exc) {
@@ -179,6 +189,15 @@ export function TfsImportDialog() {
               placeholder="Active"
               disabled={loading}
               required
+            />
+          </label>
+          <label>
+            Roadmap State
+            <input
+              value={roadmapState}
+              onChange={(e) => setRoadmapState(e.target.value)}
+              placeholder="необязательно"
+              disabled={loading}
             />
           </label>
 
