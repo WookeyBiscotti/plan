@@ -52,19 +52,24 @@ function reducer(state: ProjectState, action: Action): ProjectState {
       return { ...state, tasks: [...state.tasks, task] }
     }
     case 'place': {
+      const hasKids = state.tasks.some((t) => t.parentId === action.taskId)
       return {
         ...state,
         tasks: state.tasks.map((task) => {
-          if (task.id !== action.taskId) return task
-          const kids = state.tasks.some((t) => t.parentId === task.id)
-          if (task.parentId) {
-            return { ...task, assigneeId: action.personId, start: action.date }
+          if (task.id === action.taskId) {
+            if (task.parentId) {
+              return { ...task, assigneeId: action.personId, start: action.date }
+            }
+            return {
+              ...task,
+              start: action.date,
+              assigneeId: hasKids ? task.assigneeId : action.personId,
+            }
           }
-          return {
-            ...task,
-            start: action.date,
-            assigneeId: kids ? task.assigneeId : action.personId,
+          if (hasKids && task.parentId === action.taskId && !task.assigneeId) {
+            return { ...task, assigneeId: action.personId }
           }
+          return task
         }),
       }
     }

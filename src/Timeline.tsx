@@ -13,7 +13,7 @@ import {
 } from './dates'
 import { usePlan, useRootSelected } from './store'
 import { TrashIcon } from './icons'
-import type { Id, Person, Placement, Task } from './types'
+import type { EpicStats, Id, Person, Placement, Task } from './types'
 
 export const DAY_W = 34
 export const LABEL_W = 176
@@ -35,6 +35,24 @@ function barStyle(days: Date[], start: string, end: string) {
     left: startI * DAY_W + 3,
     width: Math.max(DAY_W - 6, (endI - startI + 1) * DAY_W - 6),
   }
+}
+
+function epicSpan(
+  task: Task,
+  stats: EpicStats | undefined,
+  placements: Record<Id, Placement>,
+): { start: string; end: string } | null {
+  const start = stats?.start ?? task.start
+  if (!start) return null
+
+  const end =
+    stats?.finish ??
+    placements[task.id]?.end ??
+    workDates(parseISO(start), Math.max(1, task.estimateDays)).at(-1) ??
+    null
+  if (!end) return null
+
+  return { start, end }
 }
 
 function personById(people: Person[], id: Id | null) {
@@ -150,10 +168,9 @@ export function Timeline() {
             ))}
             {epics.map((task) => {
               const stats = schedule.stats[task.id]
-              const start = stats?.start ?? task.start
-              const end = stats?.finish ?? schedule.placements[task.id]?.end
-              if (!start || !end) return null
-              const box = barStyle(days, start, end)
+              const span = epicSpan(task, stats, schedule.placements)
+              if (!span) return null
+              const box = barStyle(days, span.start, span.end)
               if (!box) return null
               const kids = state.tasks.filter((t) => t.parentId === task.id)
               return (
