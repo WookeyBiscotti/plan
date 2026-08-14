@@ -1,15 +1,32 @@
-import { useState, type DragEvent, type FormEvent, type MouseEvent } from 'react'
+import { useMemo, useState, type DragEvent, type FormEvent, type MouseEvent } from 'react'
 import { daysLabel } from './dates'
 import { TrashIcon } from './icons'
 import { usePlan } from './store'
+
+function matchesFilter(title: string, tfsId: number | undefined, query: string): boolean {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return true
+  if (title.toLowerCase().includes(needle)) return true
+  if (tfsId != null && String(tfsId).includes(needle)) return true
+  return false
+}
 
 export function Backlog() {
   const { state, schedule, addBacklog, unplace, remove, setDraggingId, setSelectedId, selectedId } =
     usePlan()
   const [title, setTitle] = useState('')
   const [estimate, setEstimate] = useState(5)
+  const [filter, setFilter] = useState('')
 
-  const items = state.tasks.filter((t) => t.parentId === null && !t.start)
+  const items = useMemo(
+    () => state.tasks.filter((t) => t.parentId === null && !t.start),
+    [state.tasks],
+  )
+
+  const visible = useMemo(
+    () => items.filter((task) => matchesFilter(task.title, task.tfsId, filter)),
+    [items, filter],
+  )
 
   function onSubmit(event: FormEvent) {
     event.preventDefault()
@@ -43,10 +60,20 @@ export function Backlog() {
       <header className="backlog-head">
         <h2>Входящие</h2>
         <p>Грубая оценка. Перетащите на дорожку, чтобы увидеть дату окончания.</p>
+        {items.length > 0 && (
+          <label className="backlog-filter">
+            Поиск
+            <input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Название или ID"
+            />
+          </label>
+        )}
       </header>
 
       <ul className="backlog-list">
-        {items.map((task) => {
+        {visible.map((task) => {
           const kids = state.tasks.filter((t) => t.parentId === task.id).length
           return (
             <li key={task.id}>
@@ -84,6 +111,9 @@ export function Backlog() {
 
       {items.length === 0 && (
         <p className="backlog-empty">Бэклог пуст — все крупные задачи уже на плане.</p>
+      )}
+      {items.length > 0 && visible.length === 0 && (
+        <p className="backlog-empty">Ничего не найдено по «{filter.trim()}».</p>
       )}
 
       <form className="backlog-form" onSubmit={onSubmit}>

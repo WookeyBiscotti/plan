@@ -291,6 +291,27 @@ ul {
   margin-top: 6px;
 }
 
+.backlog-filter {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #9a9184;
+}
+
+.backlog-filter input {
+  background: #131210;
+  border: 1px solid rgba(232, 220, 200, 0.14);
+  padding: 7px 8px;
+  border-radius: 2px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+  color: #ebe4d6;
+}
+
 .backlog-list {
   flex: 1;
   overflow: auto;
