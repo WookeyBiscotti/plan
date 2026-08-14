@@ -85,10 +85,6 @@ export function TfsImportDialog() {
       setError('Укажите Area Path')
       return
     }
-    if (states.length === 0) {
-      setError('Укажите State')
-      return
-    }
 
     setLoading(true)
     setError('')
@@ -187,9 +183,8 @@ export function TfsImportDialog() {
             <input
               value={stateFilter}
               onChange={(e) => setStateFilter(e.target.value)}
-              placeholder="Active"
+              placeholder="необязательно"
               disabled={loading}
-              required
             />
           </label>
           <label>

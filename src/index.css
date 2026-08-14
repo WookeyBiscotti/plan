@@ -106,7 +106,8 @@ ul {
 .section-head button,
 .panel-actions button,
 .link-mode,
-.tfs-actions button {
+.tfs-actions button,
+.project-io button {
   background: transparent;
   border: 1px solid rgba(232, 220, 200, 0.18);
   color: #ebe4d6;
@@ -119,7 +120,8 @@ ul {
 .backlog-form button:hover,
 .panel-actions button:hover,
 .link-mode:hover,
-.tfs-actions button:hover {
+.tfs-actions button:hover,
+.project-io button:hover {
   border-color: #d06a32;
   color: #f3ece0;
 }
@@ -134,6 +136,23 @@ ul {
 
 .team-wrap {
   position: relative;
+}
+
+.project-io {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  max-width: 420px;
+}
+
+.project-io-error {
+  flex: 1 1 100%;
+  margin: 0;
+  color: #c45c4a;
+  font-size: 12px;
+  text-align: right;
 }
 
 .team-pop {

@@ -4,11 +4,12 @@ import { daysLabel, formatDayMonth } from './dates'
 import { TaskPanel } from './TaskPanel'
 import { TeamEditor } from './TeamEditor'
 import { Timeline } from './Timeline'
+import { ProjectIO } from './ProjectIO'
 import { TfsImportDialog } from './TfsImportDialog'
 import { PlanProvider, usePlan } from './store'
 
 function Shell() {
-  const { state, schedule, reset, selectedId, setSelectedId } = usePlan()
+  const { state, schedule, selectedId, setSelectedId } = usePlan()
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -49,9 +50,7 @@ function Shell() {
           <div className="top-actions">
             <TfsImportDialog />
             <TeamEditor />
-            <button type="button" onClick={reset}>
-              Сбросить демо
-            </button>
+            <ProjectIO />
           </div>
         </div>
       </header>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useReducer, useState, type ReactNode } from 'react'
 import { createContext, useCallback, useContext } from 'react'
 import { buildSchedule, rootIdOf, wouldCycle } from './schedule'
-import { createSeed, PEOPLE_COLORS } from './seed'
+import { createEmptyProject, createSeed, PEOPLE_COLORS } from './seed'
 import { mergeImportedTasks } from './tfsImport'
 import type { Id, ProjectState, ScheduleResult, Task } from './types'
 
@@ -33,6 +33,8 @@ type Action =
   | { type: 'patch-person'; personId: Id; patch: { name?: string; role?: string } }
   | { type: 'remove-person'; personId: Id }
   | { type: 'import-tasks'; tasks: Task[] }
+  | { type: 'load-project'; project: ProjectState }
+  | { type: 'clear-project' }
   | { type: 'reset' }
 
 function reducer(state: ProjectState, action: Action): ProjectState {
@@ -182,6 +184,10 @@ function reducer(state: ProjectState, action: Action): ProjectState {
       const { tasks } = mergeImportedTasks(state.tasks, action.tasks)
       return { ...state, tasks }
     }
+    case 'load-project':
+      return action.project
+    case 'clear-project':
+      return createEmptyProject()
     case 'reset':
       return createSeed()
   }
@@ -209,6 +215,8 @@ type Store = {
   patchPerson: (personId: Id, patch: { name?: string; role?: string }) => void
   removePerson: (personId: Id) => void
   importTasks: (tasks: Task[]) => { added: number; updated: number }
+  importProject: (project: ProjectState) => void
+  clearProject: () => void
   reset: () => void
 }
 
@@ -283,6 +291,16 @@ export function PlanProvider({ children }: { children: ReactNode }) {
     return { added, updated }
   }, [state.tasks])
 
+  const importProject = useCallback((project: ProjectState) => {
+    dispatch({ type: 'load-project', project })
+    setSelectedId(null)
+  }, [])
+
+  const clearProject = useCallback(() => {
+    dispatch({ type: 'clear-project' })
+    setSelectedId(null)
+  }, [])
+
   const reset = useCallback(() => {
     dispatch({ type: 'reset' })
     setSelectedId('pay')
@@ -309,6 +327,8 @@ export function PlanProvider({ children }: { children: ReactNode }) {
       patchPerson,
       removePerson,
       importTasks,
+      importProject,
+      clearProject,
       reset,
     }),
     [
@@ -328,6 +348,8 @@ export function PlanProvider({ children }: { children: ReactNode }) {
       patchPerson,
       removePerson,
       importTasks,
+      importProject,
+      clearProject,
       reset,
     ],
   )

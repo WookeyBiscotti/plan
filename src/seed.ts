@@ -3,6 +3,14 @@ import type { ProjectState } from './types'
 
 export const PEOPLE_COLORS = ['#c45c26', '#4f7f8b', '#8b6b4f', '#5c6b4a', '#7a4e5c', '#3f5f7a']
 
+export function createEmptyProject(): ProjectState {
+  return {
+    planStart: mondayOnOrBefore(todayISO()),
+    people: [],
+    tasks: [],
+  }
+}
+
 export function createSeed(): ProjectState {
   const planStart = mondayOnOrBefore(todayISO())
   const day = (offset: number) => toISO(addDays(parseISO(planStart), offset))
