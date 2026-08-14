@@ -5,6 +5,8 @@ export type Person = {
   name: string
   role: string
   color: string
+  /** Скрыть дорожку на таймлайне (задачи остаются в плане). */
+  timelineHidden?: boolean
 }
 
 /** Блокер из TFS, не импортированный в план (вне группы Child). */

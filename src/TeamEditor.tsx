@@ -3,7 +3,7 @@ import { TrashIcon } from './icons'
 import { usePlan } from './store'
 
 export function TeamEditor() {
-  const { state, addPerson, patchPerson, removePerson } = usePlan()
+  const { state, addPerson, patchPerson, removePerson, togglePersonTimeline } = usePlan()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [role, setRole] = useState('Dev')
@@ -63,6 +63,15 @@ export function TeamEditor() {
                     if (!person.role.trim()) patchPerson(person.id, { role: 'Dev' })
                   }}
                 />
+                <button
+                  type="button"
+                  className={`team-toggle${person.timelineHidden ? ' is-off' : ''}`}
+                  aria-label={person.timelineHidden ? `Показать ${person.name} на таймлайне` : `Скрыть ${person.name} на таймлайне`}
+                  title={person.timelineHidden ? 'Показать на таймлайне' : 'Скрыть с таймлайна'}
+                  onClick={() => togglePersonTimeline(person.id)}
+                >
+                  {person.timelineHidden ? 'Скрыт' : 'Виден'}
+                </button>
                 <button
                   type="button"
                   className="backlog-trash"

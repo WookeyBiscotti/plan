@@ -1,0 +1,68 @@
+import { toISO } from './dates'
+import type { Id } from './types'
+
+export const DEFAULT_DAY_W = 34
+export const TIMELINE_DAYS = 120
+
+export const DAY_WIDTH_PRESETS = [
+  { id: 'large', label: 'Крупно', width: 42 },
+  { id: 'normal', label: 'Обычный', width: 34 },
+  { id: 'compact', label: 'Компакт', width: 22 },
+  { id: 'overview', label: 'Обзор', width: 14 },
+] as const
+
+export type DayWidthPresetId = (typeof DAY_WIDTH_PRESETS)[number]['id']
+
+const DAY_WIDTH_KEY = 'team-plan-day-width'
+
+export const EPIC_COLORS = [
+  '#c45c26',
+  '#4f7f8b',
+  '#8b6b4f',
+  '#5c6b4a',
+  '#7a4e5c',
+  '#3f5f7a',
+  '#9a7b4f',
+  '#6b5c8b',
+  '#4a7a6b',
+  '#8b4a5c',
+]
+
+export function readDayWidth(): number {
+  try {
+    const raw = localStorage.getItem(DAY_WIDTH_KEY)
+    if (!raw) return DEFAULT_DAY_W
+    const parsed = Number.parseInt(raw, 10)
+    if (DAY_WIDTH_PRESETS.some((preset) => preset.width === parsed)) return parsed
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_DAY_W
+}
+
+export function writeDayWidth(width: number): void {
+  localStorage.setItem(DAY_WIDTH_KEY, String(width))
+}
+
+export function epicColor(taskId: Id): string {
+  let hash = 0
+  for (let i = 0; i < taskId.length; i++) hash = (hash * 31 + taskId.charCodeAt(i)) | 0
+  return EPIC_COLORS[Math.abs(hash) % EPIC_COLORS.length]
+}
+
+export function barStyle(days: Date[], start: string, end: string, dayW: number) {
+  const startI = days.findIndex((d) => toISO(d) === start)
+  const endI = days.findIndex((d) => toISO(d) === end)
+  if (startI < 0 || endI < 0) return null
+  return {
+    left: startI * dayW + 3,
+    width: Math.max(dayW - 6, (endI - startI + 1) * dayW - 6),
+  }
+}
+
+export function dateFromPoint(body: HTMLElement, clientX: number, days: Date[], dayW: number): string {
+  const rect = body.getBoundingClientRect()
+  const x = clientX - rect.left
+  const index = Math.min(days.length - 1, Math.max(0, Math.floor(x / dayW)))
+  return toISO(days[index])
+}

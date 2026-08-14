@@ -32,3 +32,31 @@ export function LockIcon({ className }: { className?: string }) {
     </svg>
   )
 }
+
+export function EyeIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M1.5 8s2.5-4 6.5-4 6.5 4 6.5 4-2.5 4-6.5 4-6.5-4-6.5-4Z"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+      <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
+  )
+}
+
+export function EyeOffIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M2 2l12 12M6.2 6.2A3.5 3.5 0 0 0 8 11.5c3.2 0 5.5-2.8 6.5-3.5M4.7 4.9C2.8 6.1 1.5 8 1.5 8s2.5 4 6.5 4c.8 0 1.5-.1 2.2-.4"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}

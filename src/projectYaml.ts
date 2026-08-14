@@ -53,12 +53,14 @@ function readStringList(value: unknown, field: string): Id[] {
 
 function parsePerson(value: unknown, index: number): Person {
   if (!isRecord(value)) throw new Error(`people[${index}]: ожидается объект`)
-  return {
+  const person: Person = {
     id: readId(value.id, `people[${index}].id`),
     name: readString(value.name, `people[${index}].name`),
     role: readString(value.role, `people[${index}].role`),
     color: readString(value.color, `people[${index}].color`),
   }
+  if (value.timelineHidden === true) person.timelineHidden = true
+  return person
 }
 
 function parseExternalBlocker(value: unknown, index: number, taskIndex: number): ExternalBlocker {
@@ -142,7 +144,11 @@ export function serializeProjectYaml(project: ProjectState): string {
   const payload = {
     version: PROJECT_YAML_VERSION,
     planStart: project.planStart,
-    people: project.people.map(({ id, name, role, color }) => ({ id, name, role, color })),
+    people: project.people.map(({ id, name, role, color, timelineHidden }) => {
+      const row: Record<string, unknown> = { id, name, role, color }
+      if (timelineHidden) row.timelineHidden = true
+      return row
+    }),
     tasks: project.tasks.map((task) => {
       const row: Record<string, unknown> = {
         id: task.id,

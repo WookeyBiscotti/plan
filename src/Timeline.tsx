@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent, 
 import {
   daysLabel,
   formatDay,
+  formatDayMonth,
   isWeekend,
+  mondayOnOrBefore,
   monthLabel,
   parseISO,
   rangeDays,
@@ -12,16 +14,23 @@ import {
   workDates,
 } from './dates'
 import { usePlan, useRootSelected } from './store'
-import { TrashIcon, LockIcon } from './icons'
+import { TrashIcon, LockIcon, EyeOffIcon } from './icons'
 import { TfsLink } from './TfsLink'
 import type { EpicStats, Id, Person, Placement, Task } from './types'
 import { hasExternalBlockers } from './tfsImport'
+import {
+  barStyle,
+  dateFromPoint,
+  DAY_WIDTH_PRESETS,
+  epicColor,
+  readDayWidth,
+  TIMELINE_DAYS,
+  writeDayWidth,
+} from './timelineView'
 
-export const DAY_W = 34
 export const LABEL_W = 176
 export const LANE_H = 56
 export const EPIC_ROW_H = 44
-const TIMELINE_DAYS = 70
 
 type EpicItem = {
   task: Task
@@ -53,23 +62,6 @@ function assignEpicRows(items: EpicItem[]): EpicItem[][] {
   return rows
 }
 
-function dateFromPoint(body: HTMLElement, clientX: number, days: Date[]): string {
-  const rect = body.getBoundingClientRect()
-  const x = clientX - rect.left
-  const index = Math.min(days.length - 1, Math.max(0, Math.floor(x / DAY_W)))
-  return toISO(days[index])
-}
-
-function barStyle(days: Date[], start: string, end: string) {
-  const startI = days.findIndex((d) => toISO(d) === start)
-  const endI = days.findIndex((d) => toISO(d) === end)
-  if (startI < 0 || endI < 0) return null
-  return {
-    left: startI * DAY_W + 3,
-    width: Math.max(DAY_W - 6, (endI - startI + 1) * DAY_W - 6),
-  }
-}
-
 function epicSpan(task: Task): { start: string; end: string } | null {
   if (!task.start) return null
   const end = workDates(parseISO(task.start), Math.max(1, task.estimateDays)).at(-1)
@@ -91,24 +83,63 @@ export function Timeline() {
     setDraggingId,
     place,
     moveEpicStart,
+    shiftPlanStart,
+    setPlanStart,
     setSelectedId,
     selectedId,
   } = usePlan()
   const rootSelected = useRootSelected()
   const scroller = useRef<HTMLDivElement>(null)
+  const prevPlanStart = useRef(state.planStart)
   const epicBodies = useRef<Map<number, HTMLElement>>(new Map())
   const [epicHoverDate, setEpicHoverDate] = useState<string | null>(null)
   const [epicMove, setEpicMove] = useState<{ taskId: Id; date: string } | null>(null)
+  const [dayW, setDayW] = useState(readDayWidth)
   const days = useMemo(() => rangeDays(state.planStart, TIMELINE_DAYS), [state.planStart])
   const today = todayISO()
   const todayIndex = days.findIndex((d) => toISO(d) === today)
-  const width = days.length * DAY_W
+  const width = days.length * dayW
+  const visiblePeople = useMemo(
+    () => state.people.filter((person) => !person.timelineHidden),
+    [state.people],
+  )
+  const rangeEnd = days.length > 0 ? toISO(days[days.length - 1]) : state.planStart
+
+  useEffect(() => {
+    const prev = prevPlanStart.current
+    if (prev !== state.planStart) {
+      const deltaDays = Math.round(
+        (parseISO(state.planStart).getTime() - parseISO(prev).getTime()) / 86_400_000,
+      )
+      if (scroller.current && deltaDays !== 0) {
+        scroller.current.scrollLeft = Math.max(0, scroller.current.scrollLeft + deltaDays * dayW)
+      }
+      prevPlanStart.current = state.planStart
+    }
+  }, [state.planStart, dayW])
 
   useEffect(() => {
     const el = scroller.current
     if (!el || todayIndex < 0) return
-    el.scrollLeft = Math.max(0, todayIndex * DAY_W - 120)
-  }, [todayIndex])
+    el.scrollLeft = Math.max(0, todayIndex * dayW - 120)
+  }, [todayIndex, dayW])
+
+function scrollToToday() {
+    const monday = mondayOnOrBefore(today)
+    setPlanStart(monday)
+    requestAnimationFrame(() => {
+      const el = scroller.current
+      if (!el) return
+      const viewDays = rangeDays(monday, TIMELINE_DAYS)
+      const idx = viewDays.findIndex((d) => toISO(d) === today)
+      if (idx >= 0) el.scrollLeft = Math.max(0, idx * dayW - 120)
+    })
+  }
+
+  function onZoomChange(width: number) {
+    setDayW(width)
+    writeDayWidth(width)
+  }
 
   const dragging = state.tasks.find((t) => t.id === draggingId) ?? null
   const draggingRoot = dragging && dragging.parentId === null ? dragging : null
@@ -166,7 +197,7 @@ export function Timeline() {
       })
       if (!body) return
       setEpicMove((prev) =>
-        prev ? { ...prev, date: dateFromPoint(body, event.clientX, days) } : null,
+        prev ? { ...prev, date: dateFromPoint(body, event.clientX, days, dayW) } : null,
       )
     }
 
@@ -183,11 +214,11 @@ export function Timeline() {
       window.removeEventListener('pointermove', onPointerMove)
       window.removeEventListener('pointerup', onPointerUp)
     }
-  }, [epicMove, days, moveEpicStart])
+  }, [epicMove, days, dayW, moveEpicStart])
 
   function epicDateFromEvent(event: DragEvent<HTMLElement> | React.DragEvent<HTMLElement>) {
     const body = event.currentTarget
-    return dateFromPoint(body, event.clientX, days)
+    return dateFromPoint(body, event.clientX, days, dayW)
   }
 
   function onEpicDragOver(event: DragEvent<HTMLElement>) {
@@ -223,7 +254,7 @@ export function Timeline() {
     event.dataTransfer.dropEffect = 'move'
     const body = event.currentTarget.querySelector('.lane-body')
     if (!(body instanceof HTMLElement) || !draggingId) return
-    setHover({ personId, date: dateFromPoint(body, event.clientX, days) })
+    setHover({ personId, date: dateFromPoint(body, event.clientX, days, dayW) })
   }
 
   function onLaneDrop(event: DragEvent<HTMLElement>, personId: Id) {
@@ -231,7 +262,7 @@ export function Timeline() {
     const id = event.dataTransfer.getData('text/plain') || draggingId
     const body = event.currentTarget.querySelector('.lane-body')
     if (!id || !(body instanceof HTMLElement)) return
-    place(id, personId, dateFromPoint(body, event.clientX, days))
+    place(id, personId, dateFromPoint(body, event.clientX, days, dayW))
   }
 
   function startDrag(event: DragEvent, taskId: Id) {
@@ -242,14 +273,50 @@ export function Timeline() {
   }
 
   return (
-    <section className="timeline" ref={scroller}>
+    <section className="timeline">
+      <div className="timeline-toolbar">
+        <div className="timeline-nav">
+          <button type="button" onClick={() => shiftPlanStart(-14)} title="На 2 недели назад">
+            ← 2 нед
+          </button>
+          <button type="button" onClick={() => shiftPlanStart(-7)} title="На неделю назад">
+            ← Нед
+          </button>
+          <button type="button" onClick={scrollToToday} title="К текущей неделе">
+            Сегодня
+          </button>
+          <button type="button" onClick={() => shiftPlanStart(7)} title="На неделю вперёд">
+            Нед →
+          </button>
+          <button type="button" onClick={() => shiftPlanStart(14)} title="На 2 недели вперёд">
+            2 нед →
+          </button>
+        </div>
+        <p className="timeline-range">
+          {formatDayMonth(state.planStart)} — {formatDayMonth(rangeEnd)}
+        </p>
+        <label className="timeline-zoom">
+          Масштаб
+          <select
+            value={dayW}
+            onChange={(e) => onZoomChange(Number.parseInt(e.target.value, 10))}
+          >
+            {DAY_WIDTH_PRESETS.map((preset) => (
+              <option key={preset.id} value={preset.width}>
+                {preset.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className={`timeline-scroll${dayW <= 14 ? ' is-compact' : ''}`} ref={scroller}>
       <div className="timeline-inner" style={{ minWidth: LABEL_W + width }}>
         <div className="axis">
           <div className="lane-label axis-corner">Исполнитель</div>
           <div className="axis-body" style={{ width }}>
             <div className="axis-months">
               {monthGroups.map((g) => (
-                <div key={g.label} className="axis-month" style={{ width: g.count * DAY_W }}>
+                <div key={g.label} className="axis-month" style={{ width: g.count * dayW }}>
                   {g.label}
                 </div>
               ))}
@@ -261,7 +328,7 @@ export function Timeline() {
                   <div
                     key={iso}
                     className={`axis-day${isWeekend(day) ? ' is-weekend' : ''}${iso === today ? ' is-today' : ''}`}
-                    style={{ width: DAY_W }}
+                    style={{ width: dayW }}
                   >
                     <span>{weekdayLetter(day)}</span>
                     <strong>{formatDay(day)}</strong>
@@ -290,13 +357,14 @@ export function Timeline() {
                 <span
                   key={toISO(day)}
                   className={`grid-cell${isWeekend(day) ? ' is-weekend' : ''}${toISO(day) === today ? ' is-today' : ''}`}
+                  style={{ width: dayW }}
                 />
               ))}
               {epicGhostDates && (
                 <div
                   className="ghost-bar epic-ghost"
                   style={
-                    barStyle(days, epicGhostDates[0], epicGhostDates[epicGhostDates.length - 1]) ??
+                    barStyle(days, epicGhostDates[0], epicGhostDates[epicGhostDates.length - 1], dayW) ??
                     undefined
                   }
                 />
@@ -305,15 +373,16 @@ export function Timeline() {
                 <div
                   className="ghost-bar epic-ghost is-moving"
                   style={
-                    barStyle(days, epicMoveDates[0], epicMoveDates[epicMoveDates.length - 1]) ??
+                    barStyle(days, epicMoveDates[0], epicMoveDates[epicMoveDates.length - 1], dayW) ??
                     undefined
                   }
                 />
               )}
               {row.map(({ task, span, stats }) => {
-                const box = barStyle(days, span.start, span.end)
+                const box = barStyle(days, span.start, span.end, dayW)
                 if (!box) return null
                 const kids = state.tasks.filter((t) => t.parentId === task.id)
+                const color = epicColor(task.id)
                 return (
                   <button
                     key={task.id}
@@ -323,6 +392,9 @@ export function Timeline() {
                       left: box.left,
                       width: box.width,
                       opacity: epicMove?.taskId === task.id ? 0.35 : 1,
+                      background: `color-mix(in srgb, ${color} 28%, transparent)`,
+                      borderColor: color,
+                      boxShadow: `inset 3px 0 0 ${color}`,
                     }}
                     onPointerDown={(e) => beginEpicMove(e, task.id, span.start)}
                     onClick={() => setSelectedId(task.id)}
@@ -345,19 +417,23 @@ export function Timeline() {
           {todayIndex >= 0 && (
             <div
               className="today-line"
-              style={{ left: LABEL_W + todayIndex * DAY_W }}
+              style={{ left: LABEL_W + todayIndex * dayW }}
             />
           )}
-          {state.people.map((person) => (
+          {visiblePeople.length === 0 && (
+            <p className="lanes-empty">Все дорожки скрыты — включите людей в панели «Команда».</p>
+          )}
+          {visiblePeople.map((person) => (
             <Lane
               key={person.id}
               person={person}
+              dayW={dayW}
               days={days}
               today={today}
               width={width}
               placements={leafPlacements.filter((p) => p.assigneeId === person.id)}
               tasks={state.tasks}
-              people={state.people}
+              people={visiblePeople}
               selectedId={selectedId}
               rootSelected={rootSelected}
               critical={rootSelected ? schedule.stats[rootSelected]?.critical ?? [] : []}
@@ -369,15 +445,17 @@ export function Timeline() {
               onSelect={setSelectedId}
             />
           ))}
-          {rootSelected && (
+          {rootSelected && visiblePeople.length > 0 && (
             <DependencyArrows
+              dayW={dayW}
               days={days}
-              people={state.people}
+              people={visiblePeople}
               tasks={state.tasks.filter((t) => t.parentId === rootSelected)}
               placements={schedule.placements}
             />
           )}
         </div>
+      </div>
       </div>
     </section>
   )
@@ -385,6 +463,7 @@ export function Timeline() {
 
 function Lane({
   person,
+  dayW,
   days,
   today,
   width,
@@ -402,6 +481,7 @@ function Lane({
   onSelect,
 }: {
   person: Person
+  dayW: number
   days: Date[]
   today: string
   width: number
@@ -418,10 +498,10 @@ function Lane({
   onDragEnd: () => void
   onSelect: (id: Id) => void
 }) {
-  const { patchPerson, removePerson } = usePlan()
+  const { patchPerson, removePerson, togglePersonTimeline } = usePlan()
   const byId = new Map(tasks.map((t) => [t.id, t]))
   const ghostBox =
-    ghost && ghost.length > 0 ? barStyle(days, ghost[0], ghost[ghost.length - 1]) : null
+    ghost && ghost.length > 0 ? barStyle(days, ghost[0], ghost[ghost.length - 1], dayW) : null
 
   return (
     <div
@@ -453,6 +533,19 @@ function Lane({
         </span>
         <button
           type="button"
+          className="lane-hide"
+          aria-label={`Скрыть ${person.name} на таймлайне`}
+          title="Скрыть с таймлайна"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation()
+            togglePersonTimeline(person.id)
+          }}
+        >
+          <EyeOffIcon />
+        </button>
+        <button
+          type="button"
           className="lane-trash"
           aria-label={`Удалить ${person.name}`}
           title="Удалить из команды"
@@ -470,6 +563,7 @@ function Lane({
           <span
             key={toISO(day)}
             className={`grid-cell${isWeekend(day) ? ' is-weekend' : ''}${toISO(day) === today ? ' is-today' : ''}`}
+            style={{ width: dayW }}
           />
         ))}
         {ghostBox && (
@@ -478,7 +572,7 @@ function Lane({
         {placements.map((placement) => {
           const task = byId.get(placement.taskId)
           if (!task) return null
-          const box = barStyle(days, placement.start, placement.end)
+          const box = barStyle(days, placement.start, placement.end, dayW)
           if (!box) return null
           const color = personById(people, placement.assigneeId)?.color ?? person.color
           const isCrit = critical.includes(task.id)
@@ -515,31 +609,33 @@ function Lane({
 }
 
 function DependencyArrows({
+  dayW,
   days,
   people,
   tasks,
   placements,
 }: {
+  dayW: number
   days: Date[]
   people: Person[]
   tasks: Task[]
   placements: Record<Id, Placement>
 }) {
   const height = people.length * LANE_H
-  const width = days.length * DAY_W
+  const width = days.length * dayW
   const paths: { key: string; d: string; critical: boolean }[] = []
 
   for (const task of tasks) {
     const dest = placements[task.id]
     if (!dest) continue
     const destLane = people.findIndex((p) => p.id === dest.assigneeId)
-    const destBox = barStyle(days, dest.start, dest.end)
+    const destBox = barStyle(days, dest.start, dest.end, dayW)
     if (destLane < 0 || !destBox) continue
     for (const depId of task.dependsOn) {
       const src = placements[depId]
       if (!src) continue
       const srcLane = people.findIndex((p) => p.id === src.assigneeId)
-      const srcBox = barStyle(days, src.start, src.end)
+      const srcBox = barStyle(days, src.start, src.end, dayW)
       if (srcLane < 0 || !srcBox) continue
       const x1 = srcBox.left + srcBox.width
       const y1 = srcLane * LANE_H + LANE_H / 2
