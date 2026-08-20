@@ -4,12 +4,17 @@ import { TrashIcon } from './icons'
 import { TfsLink } from './TfsLink'
 import { usePlan } from './store'
 import { matchesTaskSearch } from './taskFilter'
+import { canPlaceOnTimeline, isTaskEstimated } from './taskEstimate'
 
-export function Backlog() {
+type BacklogProps = {
+  width: number
+}
+
+export function Backlog({ width }: BacklogProps) {
   const { state, schedule, addBacklog, unplace, remove, setDraggingId, setSelectedId, selectedId } =
     usePlan()
   const [title, setTitle] = useState('')
-  const [estimate, setEstimate] = useState(5)
+  const [estimate, setEstimate] = useState('')
   const [filter, setFilter] = useState('')
 
   const items = useMemo(
@@ -25,12 +30,18 @@ export function Backlog() {
   function onSubmit(event: FormEvent) {
     event.preventDefault()
     if (!title.trim()) return
-    addBacklog(title, estimate)
+    const parsed = estimate.trim() ? Number.parseInt(estimate, 10) : 0
+    addBacklog(title, Number.isFinite(parsed) ? parsed : 0)
     setTitle('')
-    setEstimate(5)
+    setEstimate('')
   }
 
   function onDragStart(event: DragEvent, taskId: string) {
+    const task = state.tasks.find((t) => t.id === taskId)
+    if (!task || !canPlaceOnTimeline(task)) {
+      event.preventDefault()
+      return
+    }
     event.dataTransfer.setData('text/plain', taskId)
     event.dataTransfer.effectAllowed = 'move'
     setDraggingId(taskId)
@@ -45,6 +56,7 @@ export function Backlog() {
   return (
     <aside
       className="backlog"
+      style={{ width, flex: 'none' }}
       onDragOver={(e) => {
         e.preventDefault()
         e.dataTransfer.dropEffect = 'move'
@@ -53,7 +65,7 @@ export function Backlog() {
     >
       <header className="backlog-head">
         <h2>Входящие</h2>
-        <p>Грубая оценка. Перетащите на дорожку, чтобы увидеть дату окончания.</p>
+        <p>Задачи без оценки нельзя перетащить на таймлайн — сначала укажите длительность.</p>
         {items.length > 0 && (
           <label className="backlog-filter">
             Поиск
@@ -69,11 +81,12 @@ export function Backlog() {
       <ul className="backlog-list">
         {visible.map((task) => {
           const kids = state.tasks.filter((t) => t.parentId === task.id).length
+          const estimated = isTaskEstimated(task)
           return (
             <li key={task.id}>
               <div
-                className={`backlog-card${selectedId === task.id ? ' is-selected' : ''}`}
-                draggable
+                className={`backlog-card${selectedId === task.id ? ' is-selected' : ''}${estimated ? '' : ' is-unestimated'}`}
+                draggable={estimated}
                 onDragStart={(e) => onDragStart(e, task.id)}
                 onDragEnd={() => setDraggingId(null)}
                 onClick={() => setSelectedId(task.id)}
@@ -81,23 +94,26 @@ export function Backlog() {
                 <div className="backlog-card-top">
                   <span className="backlog-title">{task.title}</span>
                   <div className="backlog-card-actions">
+                    {!estimated && <span className="unestimated-badge">Без оценки</span>}
                     <TfsLink task={task} />
                     <button
-                    type="button"
-                    className="backlog-trash"
-                    aria-label={`Удалить «${task.title}»`}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e: MouseEvent) => {
-                      e.stopPropagation()
-                      remove(task.id)
-                    }}
-                  >
-                    <TrashIcon />
-                  </button>
+                      type="button"
+                      className="backlog-trash"
+                      aria-label={`Удалить «${task.title}»`}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e: MouseEvent) => {
+                        e.stopPropagation()
+                        remove(task.id)
+                      }}
+                    >
+                      <TrashIcon />
+                    </button>
                   </div>
                 </div>
                 <span className="backlog-meta">
-                  {daysLabel(task.estimateDays)}
+                  {estimated
+                    ? `${daysLabel(task.estimateDays)}${task.estimateHours != null ? ` · ${task.estimateHours} ч` : ''}`
+                    : 'Укажите оценку в панели справа'}
                   {kids > 0 ? ` · ${kids} подзадач` : ''}
                 </span>
               </div>
@@ -126,10 +142,11 @@ export function Backlog() {
           Оценка, дн
           <input
             type="number"
-            min={1}
+            min={0}
             max={60}
             value={estimate}
-            onChange={(e) => setEstimate(Number(e.target.value))}
+            onChange={(e) => setEstimate(e.target.value)}
+            placeholder="необяз."
           />
         </label>
         <button type="submit">В бэклог</button>

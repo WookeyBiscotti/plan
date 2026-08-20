@@ -1,5 +1,6 @@
 import { parse, stringify } from 'yaml'
 import { mondayOnOrBefore, todayISO } from './dates'
+import { DEFAULT_VELOCITY, DEFAULT_WORK_DAY_HOURS } from './taskEstimate'
 import type { Id, Person, ProjectState, Task, ExternalBlocker } from './types'
 
 export const PROJECT_YAML_VERSION = 1
@@ -79,7 +80,7 @@ function parseTask(value: unknown, index: number): Task {
   const task: Task = {
     id: readId(value.id, `tasks[${index}].id`),
     title: readString(value.title, `tasks[${index}].title`),
-    estimateDays: Math.max(1, readNumber(value.estimateDays, `tasks[${index}].estimateDays`)),
+    estimateDays: Math.max(0, readNumber(value.estimateDays, `tasks[${index}].estimateDays`)),
     parentId: readOptionalId(value.parentId),
     assigneeId: readOptionalId(value.assigneeId),
     dependsOn: readStringList(value.dependsOn, `tasks[${index}].dependsOn`),
@@ -87,6 +88,8 @@ function parseTask(value: unknown, index: number): Task {
   }
   const tfsId = readOptionalNumber(value.tfsId)
   if (tfsId != null) task.tfsId = tfsId
+  const estimateHours = readOptionalNumber(value.estimateHours)
+  if (estimateHours != null && estimateHours > 0) task.estimateHours = estimateHours
   const tfsUrl = readOptionalString(value.tfsUrl)
   if (tfsUrl) task.tfsUrl = tfsUrl
   if (isRecord(value.tfsFields)) task.tfsFields = value.tfsFields
@@ -107,11 +110,13 @@ function normalizeProject(project: ProjectState): ProjectState {
     parentId: task.parentId && taskIds.has(task.parentId) ? task.parentId : null,
     assigneeId: task.assigneeId && peopleIds.has(task.assigneeId) ? task.assigneeId : null,
     dependsOn: task.dependsOn.filter((id) => taskIds.has(id) && id !== task.id),
-    estimateDays: Math.max(1, task.estimateDays),
+    estimateDays: Math.max(0, task.estimateDays),
   }))
 
   return {
     planStart: project.planStart,
+    workDayHours: project.workDayHours,
+    velocity: project.velocity,
     people: project.people,
     tasks,
   }
@@ -134,16 +139,20 @@ export function parseProjectYaml(text: string): ProjectState {
   if (!Array.isArray(tasksRaw)) throw new Error('Поле tasks должно быть массивом')
 
   const planStart = readOptionalString(decoded.planStart) ?? mondayOnOrBefore(todayISO())
+  const workDayHours = readOptionalNumber(decoded.workDayHours) ?? DEFAULT_WORK_DAY_HOURS
+  const velocity = readOptionalNumber(decoded.velocity) ?? DEFAULT_VELOCITY
   const people = peopleRaw.map(parsePerson)
   const tasks = tasksRaw.map(parseTask)
 
-  return normalizeProject({ planStart, people, tasks })
+  return normalizeProject({ planStart, workDayHours, velocity, people, tasks })
 }
 
 export function serializeProjectYaml(project: ProjectState): string {
   const payload = {
     version: PROJECT_YAML_VERSION,
     planStart: project.planStart,
+    workDayHours: project.workDayHours,
+    velocity: project.velocity,
     people: project.people.map(({ id, name, role, color, timelineHidden }) => {
       const row: Record<string, unknown> = { id, name, role, color }
       if (timelineHidden) row.timelineHidden = true
@@ -159,6 +168,7 @@ export function serializeProjectYaml(project: ProjectState): string {
         dependsOn: task.dependsOn,
         start: task.start,
       }
+      if (task.estimateHours != null) row.estimateHours = task.estimateHours
       if (task.tfsId != null) row.tfsId = task.tfsId
       if (task.tfsUrl) row.tfsUrl = task.tfsUrl
       if (task.tfsFields && Object.keys(task.tfsFields).length > 0) row.tfsFields = task.tfsFields

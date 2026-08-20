@@ -1,5 +1,5 @@
-import { toISO } from './dates'
-import type { Id } from './types'
+import { addDays, DAY_MS, parseISO, toISO, workDates } from './dates'
+import type { Id, Placement, Task } from './types'
 
 export const DEFAULT_DAY_W = 34
 export const TIMELINE_DAYS = 120
@@ -51,13 +51,42 @@ export function epicColor(taskId: Id): string {
 }
 
 export function barStyle(days: Date[], start: string, end: string, dayW: number) {
-  const startI = days.findIndex((d) => toISO(d) === start)
-  const endI = days.findIndex((d) => toISO(d) === end)
+  if (days.length === 0) return null
+  const first = toISO(days[0])
+  const last = toISO(days[days.length - 1])
+  if (end < first || start > last) return null
+  const clampedStart = start < first ? first : start
+  const clampedEnd = end > last ? last : end
+  const startI = days.findIndex((d) => toISO(d) === clampedStart)
+  const endI = days.findIndex((d) => toISO(d) === clampedEnd)
   if (startI < 0 || endI < 0) return null
   return {
     left: startI * dayW + 3,
     width: Math.max(dayW - 6, (endI - startI + 1) * dayW - 6),
   }
+}
+
+/** Сколько календарных дней показать, чтобы эпики и задачи не обрезались. */
+export function timelineDayCount(
+  planStart: string,
+  tasks: Task[],
+  placements: Record<Id, Placement>,
+): number {
+  let last = toISO(addDays(parseISO(planStart), TIMELINE_DAYS - 1))
+  const consider = (iso: string | null | undefined) => {
+    if (iso && iso > last) last = iso
+  }
+  for (const task of tasks) {
+    if (!task.start || task.estimateDays <= 0) continue
+    consider(task.start)
+    consider(workDates(parseISO(task.start), task.estimateDays).at(-1) ?? null)
+  }
+  for (const placement of Object.values(placements)) {
+    consider(placement.start)
+    consider(placement.end)
+  }
+  const extra = Math.round((parseISO(last).getTime() - parseISO(planStart).getTime()) / DAY_MS) + 1
+  return Math.max(TIMELINE_DAYS, extra + 14)
 }
 
 export function dateFromPoint(body: HTMLElement, clientX: number, days: Date[], dayW: number): string {

@@ -1,4 +1,5 @@
 import { extractBlockerIds, extractChildIds, workItemWebUrl, type WorkItem } from './tfsApi'
+import { hoursToEstimateDays } from './taskEstimate'
 import type { ExternalBlocker, Id, Person, Task } from './types'
 
 export const TFS_ID_PREFIX = 'tfs-'
@@ -28,16 +29,32 @@ function fieldNumber(fields: WorkItem['fields'], key: string): number | null {
   return null
 }
 
-function estimateDays(item: WorkItem): number {
+type EstimateParts = {
+  days: number
+  hours: number | null
+}
+
+function estimateFromWorkItem(
+  item: WorkItem,
+  workDayHours: number,
+  velocity: number,
+): EstimateParts {
   const hours =
     fieldNumber(item.fields, 'Microsoft.VSTS.Scheduling.OriginalEstimate') ??
     fieldNumber(item.fields, 'Microsoft.VSTS.Scheduling.RemainingWork')
-  if (hours != null && hours > 0) return Math.max(1, Math.round(hours / 8))
+  if (hours != null && hours > 0) {
+    return {
+      hours,
+      days: hoursToEstimateDays(hours, workDayHours, velocity),
+    }
+  }
 
   const points = fieldNumber(item.fields, 'Microsoft.VSTS.Scheduling.StoryPoints')
-  if (points != null && points > 0) return Math.max(1, Math.round(points))
+  if (points != null && points > 0) {
+    return { hours: null, days: Math.max(1, Math.round(points)) }
+  }
 
-  return 1
+  return { hours: null, days: 0 }
 }
 
 function matchAssignee(people: Person[], assignedTo: unknown): Id | null {
@@ -79,7 +96,7 @@ function toTask(
   item: WorkItem,
   parentId: Id | null,
   dependsOn: Id[],
-  days: number,
+  estimate: EstimateParts,
   assigneeId: Id | null,
   externalBlockers: ExternalBlocker[],
   baseUrl: string,
@@ -88,7 +105,7 @@ function toTask(
   const task: Task = {
     id: tfsTaskId(item.id),
     title: `#${item.id} ${title}`,
-    estimateDays: days,
+    estimateDays: estimate.days,
     parentId,
     assigneeId,
     dependsOn,
@@ -97,6 +114,7 @@ function toTask(
     tfsUrl: workItemWebUrl(baseUrl, item.id),
     tfsFields: { ...item.fields },
   }
+  if (estimate.hours != null) task.estimateHours = estimate.hours
   if (externalBlockers.length > 0) task.externalBlockers = externalBlockers
   return task
 }
@@ -146,6 +164,7 @@ export function mergeImportedTasks(existing: Task[], incoming: Task[]): ImportMe
       tfsFields: task.tfsFields ?? previous?.tfsFields,
       title: task.title,
       estimateDays: task.estimateDays,
+      estimateHours: task.estimateHours,
       parentId: task.parentId ? rewrite(task.parentId) : null,
       dependsOn: task.dependsOn.map(rewrite),
       externalBlockers: task.externalBlockers ?? previous?.externalBlockers,
@@ -153,6 +172,7 @@ export function mergeImportedTasks(existing: Task[], incoming: Task[]): ImportMe
       assigneeId: previous?.assigneeId ?? task.assigneeId,
     }
     if (!merged.externalBlockers?.length) delete merged.externalBlockers
+    if (merged.estimateHours == null) delete merged.estimateHours
     mergedByLocalId.set(localId, merged)
     if (previous) updated += 1
     else added += 1
@@ -187,6 +207,8 @@ export function mapWorkItemsToTasks(
   byId: Map<number, WorkItem>,
   people: Person[],
   baseUrl: string,
+  workDayHours: number,
+  velocity: number,
 ): TfsImportResult {
   const tasks: Task[] = []
   let rootCount = 0
@@ -203,7 +225,7 @@ export function mapWorkItemsToTasks(
           root,
           null,
           [],
-          estimateDays(root),
+          estimateFromWorkItem(root, workDayHours, velocity),
           matchAssignee(people, root.fields['System.AssignedTo']),
           [],
           baseUrl,
@@ -224,7 +246,7 @@ export function mapWorkItemsToTasks(
         rootBlockerIds
           .filter((id) => siblingIds.has(id) && id !== root.id)
           .map(tfsTaskId),
-        estimateDays(root),
+        estimateFromWorkItem(root, workDayHours, velocity),
         matchAssignee(people, root.fields['System.AssignedTo']),
         rootBlockerIds
           .filter((id) => !siblingIds.has(id))
@@ -247,7 +269,7 @@ export function mapWorkItemsToTasks(
           child,
           parentId,
           dependsOn,
-          estimateDays(child),
+          estimateFromWorkItem(child, workDayHours, velocity),
           matchAssignee(people, child.fields['System.AssignedTo']),
           externalBlockers,
           baseUrl,

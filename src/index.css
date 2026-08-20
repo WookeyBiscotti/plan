@@ -43,16 +43,85 @@ ul {
   list-style: none;
 }
 
+.timeline-area {
+  min-width: 0;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.app-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+
+.resize-handle {
+  flex: none;
+  width: 4px;
+  margin: 0 -2px;
+  cursor: col-resize;
+  position: relative;
+  z-index: 2;
+  touch-action: none;
+}
+
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  inset: 0 -3px;
+}
+
+.resize-handle:hover,
+.resize-handle:active {
+  background: rgba(208, 106, 50, 0.35);
+}
+
+.backlog-card.is-unestimated {
+  border-style: dashed;
+  border-color: rgba(196, 92, 74, 0.45);
+  cursor: default;
+}
+
+.backlog-card.is-unestimated:hover {
+  border-color: rgba(196, 92, 74, 0.6);
+}
+
+.unestimated-badge {
+  flex: none;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #c45c4a;
+  border: 1px solid rgba(196, 92, 74, 0.35);
+  border-radius: 2px;
+  padding: 2px 5px;
+}
+
+.field.is-unestimated input {
+  border-color: rgba(196, 92, 74, 0.45);
+}
+
+.unestimated-hint {
+  margin: -8px 0 0;
+  font-size: 12px;
+  color: #c45c4a;
+}
+
+.subtask.is-unestimated {
+  border-left: 2px dashed rgba(196, 92, 74, 0.55);
+  padding-left: 8px;
+}
+
 .app {
-  display: grid;
-  grid-template-columns: 272px minmax(0, 1fr) 360px;
-  grid-template-rows: auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   height: 100%;
   background: #131210;
 }
 
 .top {
-  grid-column: 1 / -1;
+  flex: none;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 28px;
@@ -265,6 +334,46 @@ ul {
   color: #ebe4d6;
 }
 
+.plan-settings-pop {
+  width: 320px;
+  display: grid;
+  gap: 10px;
+}
+
+.plan-settings-pop label {
+  display: grid;
+  gap: 4px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #9a9184;
+}
+
+.plan-settings-pop input {
+  width: 100%;
+  background: #131210;
+  border: 1px solid rgba(232, 220, 200, 0.18);
+  padding: 6px 8px;
+  border-radius: 2px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+  color: #ebe4d6;
+}
+
+.plan-settings-note {
+  margin: 0;
+  font-size: 12px;
+  color: #9a9184;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.plan-settings-note b {
+  color: #ebe4d6;
+  font-weight: 500;
+}
+
 .tfs-actions {
   display: flex;
   justify-content: flex-end;
@@ -473,6 +582,7 @@ ul {
 .timeline {
   min-width: 0;
   min-height: 0;
+  flex: 1;
   display: flex;
   flex-direction: column;
   background: #131210;
@@ -1293,10 +1403,6 @@ ul {
 }
 
 @media (max-width: 1100px) {
-  .app {
-    grid-template-columns: 240px minmax(0, 1fr) 320px;
-  }
-
   .top {
     grid-template-columns: 1fr;
     gap: 10px;

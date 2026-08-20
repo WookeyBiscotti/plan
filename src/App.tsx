@@ -4,12 +4,15 @@ import { daysLabel, formatDayMonth } from './dates'
 import { TaskPanel } from './TaskPanel'
 import { TeamEditor } from './TeamEditor'
 import { Timeline } from './Timeline'
+import { PlanSettings } from './PlanSettings'
 import { ProjectIO } from './ProjectIO'
 import { TfsImportDialog } from './TfsImportDialog'
+import { ResizeHandle, useLayoutWidths } from './layoutPrefs'
 import { PlanProvider, usePlan } from './store'
 
 function Shell() {
-  const { state, schedule, selectedId, setSelectedId } = usePlan()
+  const { state, schedule, setSelectedId } = usePlan()
+  const { bodyRef, backlogW, panelW, resizeBacklog, resizePanel } = useLayoutWidths(true)
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -27,7 +30,7 @@ function Shell() {
   const last = finishes.at(-1)
 
   return (
-    <div className={`app${selectedId ? ' has-panel' : ''}`}>
+    <div className="app">
       <header className="top">
         <div className="brand">
           <p className="eyebrow">Команда разработки</p>
@@ -48,15 +51,22 @@ function Shell() {
             </p>
           )}
           <div className="top-actions">
+            <PlanSettings />
             <TfsImportDialog />
             <TeamEditor />
             <ProjectIO />
           </div>
         </div>
       </header>
-      <Backlog />
-      <Timeline />
-      <TaskPanel />
+      <div className="app-body" ref={bodyRef}>
+        <Backlog width={backlogW} />
+        <ResizeHandle label="Ширина бэклога" onDrag={resizeBacklog} />
+        <div className="timeline-area">
+          <Timeline />
+        </div>
+        <ResizeHandle label="Ширина панели задачи" onDrag={resizePanel} />
+        <TaskPanel width={panelW} />
+      </div>
     </div>
   )
 }

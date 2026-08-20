@@ -19,8 +19,10 @@ export type ExternalBlocker = {
 export type Task = {
   id: Id
   title: string
-  /** Грубая оценка (для эпика) или длительность листа, в рабочих днях. */
+  /** Грубая оценка (для эпика) или длительность листа, в рабочих днях. 0 — без оценки. */
   estimateDays: number
+  /** Сырая оценка в часах (из TFS). При смене длины дня / коэффициента дни пересчитываются. */
+  estimateHours?: number
   parentId: Id | null
   assigneeId: Id | null
   /** id задач, которые должны закончиться раньше этой. */
@@ -45,6 +47,10 @@ export type ProjectState = {
   people: Person[]
   tasks: Task[]
   planStart: string
+  /** Длина рабочего дня в часах (по умолчанию 8). */
+  workDayHours: number
+  /** Коэффициент выполнения: 0.5 → задача на 8 ч при дне 8 ч займёт 2 дня. */
+  velocity: number
 }
 
 export type Placement = {

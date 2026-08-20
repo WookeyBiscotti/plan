@@ -6,6 +6,7 @@ import { TfsFieldsModal } from './TfsFieldsModal'
 import { ExternalBlockersList } from './ExternalBlockersList'
 import { TfsLink } from './TfsLink'
 import { hasTfsFields } from './tfsFieldView'
+import { isTaskEstimated } from './taskEstimate'
 import type { Id, Task } from './types'
 
 function TfsFieldsButton({ task, onShow }: { task: Task; onShow: (task: Task) => void }) {
@@ -17,7 +18,7 @@ function TfsFieldsButton({ task, onShow }: { task: Task; onShow: (task: Task) =>
   )
 }
 
-export function TaskPanel() {
+export function TaskPanel({ width }: { width: number }) {
   const { state, schedule, selectedId, setSelectedId, patch, addSubtask, remove, toggleDep, unplace } =
     usePlan()
   const rootId = useRootSelected()
@@ -27,7 +28,7 @@ export function TaskPanel() {
 
   if (!rootId) {
     return (
-      <aside className="panel panel-empty">
+      <aside className="panel panel-empty" style={{ width, flex: 'none' }}>
         <h2>Задача</h2>
         <p>
           Выберите карточку слева или полосу на таймлайне. Крупную работу можно разложить на
@@ -43,6 +44,7 @@ export function TaskPanel() {
   const kids = state.tasks.filter((t) => t.parentId === root.id)
   const stats = schedule.stats[root.id]
   const placed = root.start !== null
+  const rootEstimated = isTaskEstimated(root)
 
   function onSubtaskClick(taskId: Id) {
     if (!linking) {
@@ -59,7 +61,7 @@ export function TaskPanel() {
 
   return (
     <>
-      <aside className="panel">
+      <aside className="panel" style={{ width, flex: 'none' }}>
         <header className="panel-head">
           <div>
             <p className="eyebrow">{placed ? 'В плане' : 'В бэклоге'}</p>
@@ -78,19 +80,29 @@ export function TaskPanel() {
           </div>
         </header>
 
-      <label className="field">
+      <label className={`field${rootEstimated ? '' : ' is-unestimated'}`}>
         Грубая оценка
         <span className="field-row">
           <input
             type="number"
-            min={1}
+            min={0}
             max={90}
             value={root.estimateDays}
             onChange={(e) => patch(root.id, { estimateDays: Number(e.target.value) })}
           />
-          <em>рабочих дней, пока не разложили</em>
+          <em>
+            {root.estimateHours != null
+              ? `${root.estimateHours} ч → ${root.estimateDays} дн (день ${state.workDayHours} ч · ×${state.velocity})`
+              : rootEstimated
+                ? 'рабочих дней, пока не разложили'
+                : '0 — без оценки, на таймлайн не ставится'}
+          </em>
         </span>
       </label>
+
+      {!rootEstimated && !placed && (
+        <p className="unestimated-hint">Укажите оценку в днях, чтобы перетащить задачу на таймлайн.</p>
+      )}
 
       {root.externalBlockers && root.externalBlockers.length > 0 && (
         <ExternalBlockersList blockers={root.externalBlockers} />
@@ -252,10 +264,11 @@ function SubtaskRow({
   onShowFields: (task: Task) => void
 }) {
   const others = siblings.filter((s) => s.id !== task.id)
+  const estimated = isTaskEstimated(task)
 
   return (
     <li
-      className={`subtask${selected ? ' is-selected' : ''}${linking ? ' is-linking' : ''}${waitLink ? ' wait-link' : ''}`}
+      className={`subtask${selected ? ' is-selected' : ''}${linking ? ' is-linking' : ''}${waitLink ? ' wait-link' : ''}${estimated ? '' : ' is-unestimated'}`}
     >
       <div className="subtask-hit">
         <button type="button" className="subtask-select" onClick={onClick}>
@@ -266,6 +279,7 @@ function SubtaskRow({
           onChange={(e) => onPatch(task.id, { title: e.target.value })}
         />
         {critical && <span className="crit">крит.</span>}
+        {!estimated && <span className="unestimated-badge">Без оценки</span>}
         <TfsLink task={task} />
         <TfsFieldsButton task={task} onShow={onShowFields} />
       </div>
@@ -274,7 +288,7 @@ function SubtaskRow({
           дн
           <input
             type="number"
-            min={1}
+            min={0}
             max={40}
             value={task.estimateDays}
             onChange={(e) => onPatch(task.id, { estimateDays: Number(e.target.value) })}

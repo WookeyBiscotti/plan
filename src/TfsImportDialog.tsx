@@ -106,7 +106,14 @@ export function TfsImportDialog() {
         states,
         roadmapStates,
       })
-      const mapped = mapWorkItemsToTasks(roots, byId, state.people, config.baseUrl)
+      const mapped = mapWorkItemsToTasks(
+        roots,
+        byId,
+        state.people,
+        config.baseUrl,
+        state.workDayHours,
+        state.velocity,
+      )
       const { added, updated } = importTasks(mapped.tasks)
       if (mapped.tasks.length === 0) {
         setInfo('По заданным фильтрам задач не найдено.')

@@ -18,13 +18,14 @@ import { TrashIcon, LockIcon, EyeOffIcon } from './icons'
 import { TfsLink } from './TfsLink'
 import type { EpicStats, Id, Person, Placement, Task } from './types'
 import { hasExternalBlockers } from './tfsImport'
+import { canPlaceOnTimeline, isTaskEstimated } from './taskEstimate'
 import {
   barStyle,
   dateFromPoint,
   DAY_WIDTH_PRESETS,
   epicColor,
   readDayWidth,
-  TIMELINE_DAYS,
+  timelineDayCount,
   writeDayWidth,
 } from './timelineView'
 
@@ -63,8 +64,8 @@ function assignEpicRows(items: EpicItem[]): EpicItem[][] {
 }
 
 function epicSpan(task: Task): { start: string; end: string } | null {
-  if (!task.start) return null
-  const end = workDates(parseISO(task.start), Math.max(1, task.estimateDays)).at(-1)
+  if (!task.start || !isTaskEstimated(task)) return null
+  const end = workDates(parseISO(task.start), task.estimateDays).at(-1)
   if (!end) return null
   return { start: task.start, end }
 }
@@ -90,12 +91,17 @@ export function Timeline() {
   } = usePlan()
   const rootSelected = useRootSelected()
   const scroller = useRef<HTMLDivElement>(null)
+  const didScrollToToday = useRef(false)
   const prevPlanStart = useRef(state.planStart)
   const epicBodies = useRef<Map<number, HTMLElement>>(new Map())
   const [epicHoverDate, setEpicHoverDate] = useState<string | null>(null)
   const [epicMove, setEpicMove] = useState<{ taskId: Id; date: string } | null>(null)
   const [dayW, setDayW] = useState(readDayWidth)
-  const days = useMemo(() => rangeDays(state.planStart, TIMELINE_DAYS), [state.planStart])
+  const dayCount = useMemo(
+    () => timelineDayCount(state.planStart, state.tasks, schedule.placements),
+    [state.planStart, state.tasks, schedule.placements],
+  )
+  const days = useMemo(() => rangeDays(state.planStart, dayCount), [state.planStart, dayCount])
   const today = todayISO()
   const todayIndex = days.findIndex((d) => toISO(d) === today)
   const width = days.length * dayW
@@ -119,18 +125,21 @@ export function Timeline() {
   }, [state.planStart, dayW])
 
   useEffect(() => {
+    if (didScrollToToday.current) return
     const el = scroller.current
     if (!el || todayIndex < 0) return
     el.scrollLeft = Math.max(0, todayIndex * dayW - 120)
+    didScrollToToday.current = true
   }, [todayIndex, dayW])
 
 function scrollToToday() {
     const monday = mondayOnOrBefore(today)
     setPlanStart(monday)
+    didScrollToToday.current = true
     requestAnimationFrame(() => {
       const el = scroller.current
       if (!el) return
-      const viewDays = rangeDays(monday, TIMELINE_DAYS)
+      const viewDays = rangeDays(monday, dayCount)
       const idx = viewDays.findIndex((d) => toISO(d) === today)
       if (idx >= 0) el.scrollLeft = Math.max(0, idx * dayW - 120)
     })
@@ -142,8 +151,12 @@ function scrollToToday() {
   }
 
   const dragging = state.tasks.find((t) => t.id === draggingId) ?? null
-  const draggingRoot = dragging && dragging.parentId === null ? dragging : null
-  const ghost = hover && dragging ? workDates(parseISO(hover.date), dragging.estimateDays) : null
+  const draggingRoot =
+    dragging && dragging.parentId === null && canPlaceOnTimeline(dragging) ? dragging : null
+  const ghost =
+    hover && dragging && canPlaceOnTimeline(dragging)
+      ? workDates(parseISO(hover.date), dragging.estimateDays)
+      : null
   const epicGhostDates =
     epicHoverDate && draggingRoot
       ? workDates(parseISO(epicHoverDate), draggingRoot.estimateDays)
@@ -191,10 +204,11 @@ function scrollToToday() {
 
     function onPointerMove(event: globalThis.PointerEvent) {
       const bodies = [...epicBodies.current.values()]
-      const body = bodies.find((node) => {
-        const rect = node.getBoundingClientRect()
-        return event.clientX >= rect.left && event.clientX <= rect.right
-      })
+      const body =
+        bodies.find((node) => {
+          const rect = node.getBoundingClientRect()
+          return event.clientX >= rect.left && event.clientX <= rect.right
+        }) ?? bodies[0]
       if (!body) return
       setEpicMove((prev) =>
         prev ? { ...prev, date: dateFromPoint(body, event.clientX, days, dayW) } : null,
@@ -233,7 +247,7 @@ function scrollToToday() {
     const id = event.dataTransfer.getData('text/plain') || draggingId
     if (!id) return
     const task = state.tasks.find((t) => t.id === id)
-    if (!task || task.parentId) return
+    if (!task || task.parentId || !canPlaceOnTimeline(task)) return
     const date = epicDateFromEvent(event)
     const personId = task.assigneeId ?? state.people[0]?.id
     if (!personId) return
@@ -242,6 +256,8 @@ function scrollToToday() {
   }
 
   function beginEpicMove(event: PointerEvent<HTMLButtonElement>, taskId: Id, start: string) {
+    const task = state.tasks.find((t) => t.id === taskId)
+    if (!task || !canPlaceOnTimeline(task)) return
     if (event.button !== 0) return
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -262,10 +278,17 @@ function scrollToToday() {
     const id = event.dataTransfer.getData('text/plain') || draggingId
     const body = event.currentTarget.querySelector('.lane-body')
     if (!id || !(body instanceof HTMLElement)) return
+    const task = state.tasks.find((t) => t.id === id)
+    if (!task || !canPlaceOnTimeline(task)) return
     place(id, personId, dateFromPoint(body, event.clientX, days, dayW))
   }
 
   function startDrag(event: DragEvent, taskId: Id) {
+    const task = state.tasks.find((t) => t.id === taskId)
+    if (!task || !canPlaceOnTimeline(task)) {
+      event.preventDefault()
+      return
+    }
     event.dataTransfer.setData('text/plain', taskId)
     event.dataTransfer.effectAllowed = 'move'
     setDraggingId(taskId)

@@ -4,6 +4,12 @@ import { buildSchedule, rootIdOf, wouldCycle } from './schedule'
 import { addDays, mondayOnOrBefore, parseISO, shiftWorkDays, toISO, workDayOffset } from './dates'
 import { createEmptyProject, createSeed, PEOPLE_COLORS } from './seed'
 import { mergeImportedTasks } from './tfsImport'
+import {
+  applyEstimateSettings,
+  canPlaceOnTimeline,
+  DEFAULT_VELOCITY,
+  DEFAULT_WORK_DAY_HOURS,
+} from './taskEstimate'
 import type { Id, ProjectState, ScheduleResult, Task } from './types'
 
 const STORAGE_KEY = 'team-plan-v1'
@@ -12,10 +18,22 @@ function uid(): string {
   return Math.random().toString(36).slice(2, 10)
 }
 
+function normalizeLoadedState(raw: ProjectState): ProjectState {
+  return {
+    ...raw,
+    workDayHours:
+      typeof raw.workDayHours === 'number' && raw.workDayHours > 0
+        ? raw.workDayHours
+        : DEFAULT_WORK_DAY_HOURS,
+    velocity:
+      typeof raw.velocity === 'number' && raw.velocity > 0 ? raw.velocity : DEFAULT_VELOCITY,
+  }
+}
+
 function loadState(): ProjectState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw) as ProjectState
+    if (raw) return normalizeLoadedState(JSON.parse(raw) as ProjectState)
   } catch {
     /* ignore */
   }
@@ -41,6 +59,7 @@ type Action =
   | { type: 'patch-person'; personId: Id; patch: { name?: string; role?: string } }
   | { type: 'toggle-person-timeline'; personId: Id }
   | { type: 'remove-person'; personId: Id }
+  | { type: 'patch-plan-settings'; patch: { workDayHours?: number; velocity?: number } }
   | { type: 'import-tasks'; tasks: Task[] }
   | { type: 'load-project'; project: ProjectState }
   | { type: 'clear-project' }
@@ -52,7 +71,7 @@ function reducer(state: ProjectState, action: Action): ProjectState {
       const task: Task = {
         id: uid(),
         title: action.title.trim() || 'Новая задача',
-        estimateDays: Math.max(1, action.estimateDays),
+        estimateDays: Math.max(0, action.estimateDays),
         parentId: null,
         assigneeId: null,
         dependsOn: [],
@@ -61,6 +80,8 @@ function reducer(state: ProjectState, action: Action): ProjectState {
       return { ...state, tasks: [...state.tasks, task] }
     }
     case 'place': {
+      const task = state.tasks.find((t) => t.id === action.taskId)
+      if (!task || !canPlaceOnTimeline(task)) return state
       const hasKids = state.tasks.some((t) => t.parentId === action.taskId)
       const planStart = planStartCovering(state.planStart, action.date)
       return {
@@ -86,7 +107,7 @@ function reducer(state: ProjectState, action: Action): ProjectState {
     }
     case 'move-epic': {
       const root = state.tasks.find((t) => t.id === action.taskId)
-      if (!root?.start) return state
+      if (!root?.start || !canPlaceOnTimeline(root)) return state
       const delta = workDayOffset(root.start, action.date)
       if (delta === 0) return state
       const planStart = planStartCovering(state.planStart, action.date)
@@ -123,17 +144,45 @@ function reducer(state: ProjectState, action: Action): ProjectState {
       }
     }
     case 'patch': {
+      const current = state.tasks.find((t) => t.id === action.taskId)
+      if (!current) return state
+      const nextEstimate =
+        action.patch.estimateDays !== undefined
+          ? Math.max(0, action.patch.estimateDays)
+          : current.estimateDays
+      let tasks = state.tasks.map((task) => {
+        if (task.id !== action.taskId) return task
+        const next: Task = { ...task, ...action.patch, estimateDays: nextEstimate }
+        if (action.patch.estimateDays !== undefined && action.patch.estimateHours === undefined) {
+          delete next.estimateHours
+        }
+        return next
+      })
+      if (nextEstimate === 0 && current.start !== null) {
+        const root = rootIdOf(tasks, action.taskId)
+        tasks = tasks.map((task) => {
+          if (task.id === root) return { ...task, start: null, assigneeId: null }
+          if (task.parentId === root) return { ...task, start: null }
+          return task
+        })
+      }
+      return { ...state, tasks }
+    }
+    case 'patch-plan-settings': {
+      const workDayHours =
+        action.patch.workDayHours !== undefined
+          ? Math.min(24, Math.max(0.5, action.patch.workDayHours))
+          : state.workDayHours
+      const velocity =
+        action.patch.velocity !== undefined
+          ? Math.min(5, Math.max(0.05, action.patch.velocity))
+          : state.velocity
+      if (workDayHours === state.workDayHours && velocity === state.velocity) return state
       return {
         ...state,
-        tasks: state.tasks.map((task) =>
-          task.id === action.taskId
-            ? {
-                ...task,
-                ...action.patch,
-                estimateDays: Math.max(1, action.patch.estimateDays ?? task.estimateDays),
-              }
-            : task,
-        ),
+        workDayHours,
+        velocity,
+        tasks: applyEstimateSettings(state.tasks, workDayHours, velocity),
       }
     }
     case 'add-subtask': {
@@ -142,7 +191,7 @@ function reducer(state: ProjectState, action: Action): ProjectState {
       const child: Task = {
         id: uid(),
         title: existing.length === 0 ? parent?.title ?? 'Подзадача' : `Подзадача ${existing.length + 1}`,
-        estimateDays: existing.length === 0 ? parent?.estimateDays ?? 2 : 2,
+        estimateDays: existing.length === 0 ? Math.max(0, parent?.estimateDays ?? 0) : 2,
         parentId: action.parentId,
         assigneeId: parent?.assigneeId ?? state.people[0]?.id ?? null,
         dependsOn: [],
@@ -238,7 +287,7 @@ function reducer(state: ProjectState, action: Action): ProjectState {
       return { ...state, tasks }
     }
     case 'load-project':
-      return action.project
+      return normalizeLoadedState(action.project)
     case 'clear-project':
       return createEmptyProject()
     case 'reset':
@@ -265,6 +314,7 @@ type Store = {
   togglePersonTimeline: (personId: Id) => void
   unplace: (taskId: Id) => void
   patch: (taskId: Id, patch: Partial<Task>) => void
+  patchPlanSettings: (patch: { workDayHours?: number; velocity?: number }) => void
   addSubtask: (parentId: Id) => void
   remove: (taskId: Id) => void
   toggleDep: (taskId: Id, depId: Id) => void
@@ -327,6 +377,10 @@ export function PlanProvider({ children }: { children: ReactNode }) {
 
   const patch = useCallback((taskId: Id, patch: Partial<Task>) => {
     dispatch({ type: 'patch', taskId, patch })
+  }, [])
+
+  const patchPlanSettings = useCallback((patch: { workDayHours?: number; velocity?: number }) => {
+    dispatch({ type: 'patch-plan-settings', patch })
   }, [])
 
   const addSubtask = useCallback((parentId: Id) => {
@@ -398,6 +452,7 @@ export function PlanProvider({ children }: { children: ReactNode }) {
       togglePersonTimeline,
       unplace,
       patch,
+      patchPlanSettings,
       addSubtask,
       remove,
       toggleDep,
@@ -423,6 +478,7 @@ export function PlanProvider({ children }: { children: ReactNode }) {
       togglePersonTimeline,
       unplace,
       patch,
+      patchPlanSettings,
       addSubtask,
       remove,
       toggleDep,

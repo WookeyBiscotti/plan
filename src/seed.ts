@@ -1,4 +1,5 @@
 import { addDays, mondayOnOrBefore, parseISO, todayISO, toISO } from './dates'
+import { DEFAULT_VELOCITY, DEFAULT_WORK_DAY_HOURS } from './taskEstimate'
 import type { ProjectState } from './types'
 
 export const PEOPLE_COLORS = ['#c45c26', '#4f7f8b', '#8b6b4f', '#5c6b4a', '#7a4e5c', '#3f5f7a']
@@ -6,6 +7,8 @@ export const PEOPLE_COLORS = ['#c45c26', '#4f7f8b', '#8b6b4f', '#5c6b4a', '#7a4e
 export function createEmptyProject(): ProjectState {
   return {
     planStart: mondayOnOrBefore(todayISO()),
+    workDayHours: DEFAULT_WORK_DAY_HOURS,
+    velocity: DEFAULT_VELOCITY,
     people: [],
     tasks: [],
   }
@@ -17,6 +20,8 @@ export function createSeed(): ProjectState {
 
   return {
     planStart,
+    workDayHours: DEFAULT_WORK_DAY_HOURS,
+    velocity: DEFAULT_VELOCITY,
     people: [
       { id: 'anna', name: 'Анна Ковалева', role: 'Frontend', color: PEOPLE_COLORS[0] },
       { id: 'boris', name: 'Борис Левин', role: 'Backend', color: PEOPLE_COLORS[1] },

@@ -187,6 +187,10 @@ export function buildSchedule(tasks: Task[]): ScheduleResult {
         unassigned.push(child.id)
         continue
       }
+      if (child.estimateDays <= 0) {
+        unassigned.push(child.id)
+        continue
+      }
       let notBefore = parseISO(root.start!)
       for (const depId of child.dependsOn) {
         const dep = placements[depId]
