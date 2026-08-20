@@ -140,9 +140,26 @@ export function buildSchedule(tasks: Task[]): ScheduleResult {
 
   for (const root of roots) {
     const kids = childrenOf(tasks, root.id)
+    const asLeaf = kids.length === 0 || root.hideSubtasks
 
-    if (kids.length === 0) {
-      if (!root.assigneeId) continue
+    if (asLeaf) {
+      if (!root.assigneeId) {
+        if (kids.length > 0 && root.hideSubtasks) {
+          stats[root.id] = {
+            taskId: root.id,
+            sumParts: root.estimateDays,
+            spanDays: 0,
+            savedDays: 0,
+            start: root.start,
+            finish: null,
+            cycle: false,
+            unassigned: [root.id],
+            critical: [],
+          }
+        }
+        continue
+      }
+      if (root.estimateDays <= 0) continue
       const slot = findSlot(root.assigneeId, root.estimateDays, root.start!, occupied)
       if (!slot) {
         errors.push(`Не удалось уложить «${root.title}»`)

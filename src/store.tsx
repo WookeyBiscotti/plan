@@ -87,21 +87,26 @@ function reducer(state: ProjectState, action: Action): ProjectState {
       return {
         ...state,
         planStart,
-        tasks: state.tasks.map((task) => {
-          if (task.id === action.taskId) {
-            if (task.parentId) {
-              return { ...task, assigneeId: action.personId, start: action.date }
+        tasks: state.tasks.map((item) => {
+          if (item.id === action.taskId) {
+            if (item.parentId) {
+              return { ...item, assigneeId: action.personId, start: action.date }
             }
             return {
-              ...task,
+              ...item,
               start: action.date,
-              assigneeId: hasKids ? task.assigneeId : action.personId,
+              assigneeId: action.personId,
             }
           }
-          if (hasKids && task.parentId === action.taskId && !task.assigneeId) {
-            return { ...task, assigneeId: action.personId }
+          if (
+            hasKids &&
+            !task.hideSubtasks &&
+            item.parentId === action.taskId &&
+            !item.assigneeId
+          ) {
+            return { ...item, assigneeId: action.personId }
           }
-          return task
+          return item
         }),
       }
     }

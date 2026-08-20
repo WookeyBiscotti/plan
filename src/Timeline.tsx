@@ -179,11 +179,23 @@ function scrollToToday() {
     return groups
   }, [days])
 
-  const leafPlacements = Object.values(schedule.placements)
+  const leafPlacements = Object.values(schedule.placements).filter((placement) => {
+    const task = state.tasks.find((t) => t.id === placement.taskId)
+    if (!task) return false
+    if (task.parentId) {
+      const parent = state.tasks.find((t) => t.id === task.parentId)
+      return !parent?.hideSubtasks
+    }
+    return true
+  })
 
   const epicRows = useMemo(() => {
     const epicTasks = state.tasks.filter(
-      (t) => t.parentId === null && t.start && state.tasks.some((c) => c.parentId === t.id),
+      (t) =>
+        t.parentId === null &&
+        t.start &&
+        !t.hideSubtasks &&
+        state.tasks.some((c) => c.parentId === t.id),
     )
     const items: EpicItem[] = []
     for (const task of epicTasks) {
@@ -468,7 +480,9 @@ function scrollToToday() {
               onSelect={setSelectedId}
             />
           ))}
-          {rootSelected && visiblePeople.length > 0 && (
+          {rootSelected &&
+            visiblePeople.length > 0 &&
+            !state.tasks.find((t) => t.id === rootSelected)?.hideSubtasks && (
             <DependencyArrows
               dayW={dayW}
               days={days}

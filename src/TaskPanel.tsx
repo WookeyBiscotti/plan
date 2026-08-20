@@ -104,6 +104,49 @@ export function TaskPanel({ width }: { width: number }) {
         <p className="unestimated-hint">Укажите оценку в днях, чтобы перетащить задачу на таймлайн.</p>
       )}
 
+      <label className="field">
+        Исполнитель
+        <select
+          value={root.assigneeId ?? ''}
+          onChange={(e) => patch(root.id, { assigneeId: e.target.value || null })}
+        >
+          <option value="">— не назначен</option>
+          {state.people.map((person) => (
+            <option key={person.id} value={person.id}>
+              {person.name}
+            </option>
+          ))}
+        </select>
+        <em>
+          {kids.length > 0 && root.hideSubtasks
+            ? 'главная задача на дорожке этого человека'
+            : kids.length > 0
+              ? 'нужен, если скрыть подзадачи и планировать целиком'
+              : 'дорожка на таймлайне'}
+        </em>
+      </label>
+
+      {kids.length > 0 && (
+        <label className="field check-field">
+          <span className="field-row">
+            <input
+              type="checkbox"
+              checked={!!root.hideSubtasks}
+              onChange={(e) => patch(root.id, { hideSubtasks: e.target.checked })}
+            />
+            Скрыть подзадачи на таймлайне
+          </span>
+          <em>
+            Планировать главную задачу по её оценке на выбранного исполнителя. Подзадачи остаются в
+            панели, но не занимают дорожки.
+          </em>
+        </label>
+      )}
+
+      {root.hideSubtasks && kids.length > 0 && placed && !root.assigneeId && (
+        <p className="unestimated-hint">Выберите исполнителя, чтобы главная задача появилась на таймлайне.</p>
+      )}
+
       {root.externalBlockers && root.externalBlockers.length > 0 && (
         <ExternalBlockersList blockers={root.externalBlockers} />
       )}
@@ -134,7 +177,7 @@ export function TaskPanel({ width }: { width: number }) {
         <div className={`metrics${stats.savedDays > 0 ? ' has-save' : ''}${stats.cycle ? ' is-bad' : ''}`}>
           {stats.cycle ? (
             <p>В зависимостях цикл — план не считается.</p>
-          ) : kids.length > 0 ? (
+          ) : kids.length > 0 && !root.hideSubtasks ? (
             <>
               <div>
                 <b>{daysLabel(stats.spanDays)}</b>
@@ -165,16 +208,17 @@ export function TaskPanel({ width }: { width: number }) {
         </div>
       )}
 
-      <div className="panel-section">
+      <div className={`panel-section${root.hideSubtasks ? ' is-collapsed' : ''}`}>
         <div className="section-head">
-          <h3>Подзадачи</h3>
+          <h3>Подзадачи{root.hideSubtasks ? ' · скрыты' : ''}</h3>
           <button type="button" onClick={() => addSubtask(root.id)}>
             Добавить
           </button>
         </div>
         <p className="hint">
-          Независимые куски на разных людях идут одновременно. Связь: включите режим, затем
-          кликните работу-предшественник и ту, что должна ждать.
+          {root.hideSubtasks
+            ? 'Подзадачи скрыты с таймлайна — на дорожке лежит главная задача. Снимите галочку, чтобы снова планировать по частям.'
+            : 'Независимые куски на разных людях идут одновременно. Связь: включите режим, затем кликните работу-предшественник и ту, что должна ждать.'}
         </p>
         {kids.length > 1 && (
           <button

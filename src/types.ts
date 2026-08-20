@@ -41,6 +41,11 @@ export type Task = {
   tfsFields?: Record<string, unknown>
   /** Блокеры вне импортированной группы подзадач. */
   externalBlockers?: ExternalBlocker[]
+  /**
+   * Скрыть подзадачи на таймлайне: корневая задача планируется как цельная
+   * оценка на выбранного исполнителя.
+   */
+  hideSubtasks?: boolean
 }
 
 export type ProjectState = {

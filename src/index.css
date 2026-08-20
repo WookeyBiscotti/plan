@@ -102,6 +102,21 @@ ul {
   border-color: rgba(196, 92, 74, 0.45);
 }
 
+.check-field .field-row {
+  align-items: center;
+  gap: 8px;
+}
+
+.check-field input[type='checkbox'] {
+  width: auto;
+  margin: 0;
+  accent-color: #d06a32;
+}
+
+.panel-section.is-collapsed .subtasks {
+  opacity: 0.55;
+}
+
 .unestimated-hint {
   margin: -8px 0 0;
   font-size: 12px;
@@ -535,6 +550,7 @@ ul {
 
 .backlog-form input,
 .field input,
+.field select,
 .panel-title,
 .subtask input,
 .subtask select {

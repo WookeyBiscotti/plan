@@ -114,7 +114,7 @@ export function Backlog({ width }: BacklogProps) {
                   {estimated
                     ? `${daysLabel(task.estimateDays)}${task.estimateHours != null ? ` · ${task.estimateHours} ч` : ''}`
                     : 'Укажите оценку в панели справа'}
-                  {kids > 0 ? ` · ${kids} подзадач` : ''}
+                  {kids > 0 ? ` · ${kids} подзадач${task.hideSubtasks ? ' (скрыты)' : ''}` : ''}
                 </span>
               </div>
             </li>

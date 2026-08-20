@@ -98,6 +98,7 @@ function parseTask(value: unknown, index: number): Task {
       parseExternalBlocker(item, blockerIndex, index),
     )
   }
+  if (value.hideSubtasks === true) task.hideSubtasks = true
   return task
 }
 
@@ -173,6 +174,7 @@ export function serializeProjectYaml(project: ProjectState): string {
       if (task.tfsUrl) row.tfsUrl = task.tfsUrl
       if (task.tfsFields && Object.keys(task.tfsFields).length > 0) row.tfsFields = task.tfsFields
       if (task.externalBlockers?.length) row.externalBlockers = task.externalBlockers
+      if (task.hideSubtasks) row.hideSubtasks = true
       return row
     }),
   }
