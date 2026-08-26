@@ -71,7 +71,23 @@ function matchesPlainSearch(task: Task, needle: string): boolean {
   return false
 }
 
-/** Поиск по названию/ID или фильтр TFS «поле: значение». */
+export const ROADMAP_STATE_FIELD = 'Roadmap State'
+
+export function taskRoadmapState(task: Task): string | null {
+  const fields = task.tfsFields
+  if (!fields) return null
+  const value = fields[ROADMAP_STATE_FIELD]
+  if (value == null || value === '') return null
+  const text = formatFieldValue(ROADMAP_STATE_FIELD, value).trim()
+  if (!text || text === '—') return null
+  return text
+}
+
+export function matchesRoadmapState(task: Task, selected: string): boolean {
+  if (!selected) return true
+  return taskRoadmapState(task) === selected
+}
+
 export function matchesTaskSearch(task: Task, query: string): boolean {
   const raw = query.trim()
   if (!raw) return true

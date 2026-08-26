@@ -13,6 +13,7 @@ const FIELD_ORDER = [
   'Microsoft.VSTS.Scheduling.OriginalEstimate',
   'Microsoft.VSTS.Scheduling.RemainingWork',
   'Microsoft.VSTS.Scheduling.CompletedWork',
+  'Estimation Ready Date',
   'System.CreatedDate',
   'System.ChangedDate',
   'System.CreatedBy',
@@ -40,6 +41,7 @@ const FIELD_LABELS: Record<string, string> = {
   'Microsoft.VSTS.Scheduling.OriginalEstimate': 'Оценка, ч',
   'Microsoft.VSTS.Scheduling.RemainingWork': 'Осталось, ч',
   'Microsoft.VSTS.Scheduling.CompletedWork': 'Факт, ч',
+  'Estimation Ready Date': 'Estimation Ready Date',
 }
 
 function stripHtml(html: string): string {
@@ -113,4 +115,38 @@ export function listFieldEntries(fields: Record<string, unknown>): Array<[string
 
 export function hasTfsFields(task: { tfsFields?: Record<string, unknown> }): boolean {
   return !!task.tfsFields && Object.keys(task.tfsFields).length > 0
+}
+
+function looksLikeReadyDateKey(key: string): boolean {
+  const normalized = key.toLowerCase().replace(/[._]/g, ' ')
+  return (
+    normalized === 'estimation ready date' ||
+    normalized.endsWith(' estimation ready date') ||
+    normalized.endsWith('estimationreadydate')
+  )
+}
+
+function isoDateFromField(value: unknown): string | null {
+  if (value == null || value === '') return null
+  if (typeof value === 'string') {
+    const match = /^(\d{4}-\d{2}-\d{2})/.exec(value.trim())
+    return match?.[1] ?? null
+  }
+  return null
+}
+
+/** ISO-дата Estimation Ready Date из полей TFS, если есть. */
+export function taskEstimationReadyDate(task: {
+  tfsFields?: Record<string, unknown>
+}): string | null {
+  const fields = task.tfsFields
+  if (!fields) return null
+  const direct = isoDateFromField(fields['Estimation Ready Date'])
+  if (direct) return direct
+  for (const [key, value] of Object.entries(fields)) {
+    if (!looksLikeReadyDateKey(key)) continue
+    const iso = isoDateFromField(value)
+    if (iso) return iso
+  }
+  return null
 }

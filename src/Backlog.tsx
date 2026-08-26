@@ -3,7 +3,7 @@ import { daysLabel } from './dates'
 import { TrashIcon } from './icons'
 import { TfsLink } from './TfsLink'
 import { usePlan } from './store'
-import { matchesTaskSearch } from './taskFilter'
+import { matchesRoadmapState, matchesTaskSearch, taskRoadmapState } from './taskFilter'
 import { canPlaceOnTimeline, isTaskEstimated } from './taskEstimate'
 
 type BacklogProps = {
@@ -16,15 +16,28 @@ export function Backlog({ width }: BacklogProps) {
   const [title, setTitle] = useState('')
   const [estimate, setEstimate] = useState('')
   const [filter, setFilter] = useState('')
+  const [roadmapState, setRoadmapState] = useState('')
 
   const items = useMemo(
     () => state.tasks.filter((t) => t.parentId === null && !t.start),
     [state.tasks],
   )
 
+  const roadmapStates = useMemo(() => {
+    const values = new Set<string>()
+    for (const task of items) {
+      const value = taskRoadmapState(task)
+      if (value) values.add(value)
+    }
+    return [...values].sort((a, b) => a.localeCompare(b, 'ru'))
+  }, [items])
+
   const visible = useMemo(
-    () => items.filter((task) => matchesTaskSearch(task, filter)),
-    [items, filter],
+    () =>
+      items.filter(
+        (task) => matchesTaskSearch(task, filter) && matchesRoadmapState(task, roadmapState),
+      ),
+    [items, filter, roadmapState],
   )
 
   function onSubmit(event: FormEvent) {
@@ -67,14 +80,32 @@ export function Backlog({ width }: BacklogProps) {
         <h2>Входящие</h2>
         <p>Задачи без оценки нельзя перетащить на таймлайн — сначала укажите длительность.</p>
         {items.length > 0 && (
-          <label className="backlog-filter">
-            Поиск
-            <input
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              placeholder="Название, ID или State: значение"
-            />
-          </label>
+          <div className="backlog-filters">
+            <label className="backlog-filter">
+              Поиск
+              <input
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                placeholder="Название, ID или State: значение"
+              />
+            </label>
+            {roadmapStates.length > 0 && (
+              <label className="backlog-filter">
+                Roadmap State
+                <select
+                  value={roadmapState}
+                  onChange={(e) => setRoadmapState(e.target.value)}
+                >
+                  <option value="">Все</option>
+                  {roadmapStates.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
         )}
       </header>
 
@@ -126,7 +157,11 @@ export function Backlog({ width }: BacklogProps) {
         <p className="backlog-empty">Бэклог пуст — все крупные задачи уже на плане.</p>
       )}
       {items.length > 0 && visible.length === 0 && (
-        <p className="backlog-empty">Ничего не найдено по «{filter.trim()}».</p>
+        <p className="backlog-empty">
+          Ничего не найдено
+          {filter.trim() ? ` по «${filter.trim()}»` : ''}
+          {roadmapState ? ` · Roadmap State: ${roadmapState}` : ''}.
+        </p>
       )}
 
       <form className="backlog-form" onSubmit={onSubmit}>

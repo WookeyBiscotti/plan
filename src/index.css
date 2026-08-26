@@ -432,17 +432,23 @@ ul {
   margin-top: 6px;
 }
 
+.backlog-filters {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .backlog-filter {
   display: grid;
   gap: 4px;
-  margin-top: 10px;
   font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #9a9184;
 }
 
-.backlog-filter input {
+.backlog-filter input,
+.backlog-filter select {
   background: #131210;
   border: 1px solid rgba(232, 220, 200, 0.14);
   padding: 7px 8px;
@@ -904,6 +910,38 @@ ul {
   z-index: 2;
   pointer-events: none;
   opacity: 0.55;
+}
+
+.ready-date-mark {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 10px;
+  margin-left: -5px;
+  z-index: 3;
+  pointer-events: auto;
+  cursor: default;
+}
+
+.ready-date-mark::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  left: 4px;
+  width: 0;
+  border-left: 1.5px dashed #d06a32;
+}
+
+.ready-date-mark::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 7px solid #d06a32;
 }
 
 .epic-bar,

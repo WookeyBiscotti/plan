@@ -1,4 +1,5 @@
 import { addDays, DAY_MS, parseISO, toISO, workDates } from './dates'
+import { taskEstimationReadyDate } from './tfsFieldView'
 import type { Id, Placement, Task } from './types'
 
 export const DEFAULT_DAY_W = 34
@@ -77,6 +78,7 @@ export function timelineDayCount(
     if (iso && iso > last) last = iso
   }
   for (const task of tasks) {
+    consider(taskEstimationReadyDate(task))
     if (!task.start || task.estimateDays <= 0) continue
     consider(task.start)
     consider(workDates(parseISO(task.start), task.estimateDays).at(-1) ?? null)

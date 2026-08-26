@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent, type PointerEvent } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent, type PointerEvent } from 'react'
 import {
   daysLabel,
   formatDay,
@@ -19,6 +19,7 @@ import { TfsLink } from './TfsLink'
 import type { EpicStats, Id, Person, Placement, Task } from './types'
 import { hasExternalBlockers } from './tfsImport'
 import { canPlaceOnTimeline, isTaskEstimated } from './taskEstimate'
+import { taskEstimationReadyDate } from './tfsFieldView'
 import {
   barStyle,
   dateFromPoint,
@@ -72,6 +73,28 @@ function epicSpan(task: Task): { start: string; end: string } | null {
 
 function personById(people: Person[], id: Id | null) {
   return people.find((p) => p.id === id) ?? null
+}
+
+function readyDateMarkLeft(days: Date[], iso: string, dayW: number): number | null {
+  const index = days.findIndex((d) => toISO(d) === iso)
+  if (index < 0) return null
+  return index * dayW + dayW / 2
+}
+
+function ReadyDateMark({
+  days,
+  date,
+  dayW,
+  title,
+}: {
+  days: Date[]
+  date: string
+  dayW: number
+  title: string
+}) {
+  const left = readyDateMarkLeft(days, date, dayW)
+  if (left == null) return null
+  return <div className="ready-date-mark" style={{ left }} title={title} />
 }
 
 export function Timeline() {
@@ -418,9 +441,10 @@ function scrollToToday() {
                 if (!box) return null
                 const kids = state.tasks.filter((t) => t.parentId === task.id)
                 const color = epicColor(task.id)
+                const readyDate = taskEstimationReadyDate(task)
                 return (
+                  <Fragment key={task.id}>
                   <button
-                    key={task.id}
                     type="button"
                     className={`epic-bar${rootSelected === task.id ? ' is-selected' : ''}${epicMove?.taskId === task.id ? ' is-moving' : ''}`}
                     style={{
@@ -442,6 +466,15 @@ function scrollToToday() {
                         : daysLabel(task.estimateDays)}
                     </em>
                   </button>
+                  {readyDate && (
+                    <ReadyDateMark
+                      days={days}
+                      date={readyDate}
+                      dayW={dayW}
+                      title={`${task.title} · Estimation Ready Date ${formatDayMonth(readyDate)}`}
+                    />
+                  )}
+                  </Fragment>
                 )
               })}
             </div>
@@ -615,9 +648,13 @@ function Lane({
           const isCrit = critical.includes(task.id)
           const inEpic = rootSelected && (task.id === rootSelected || task.parentId === rootSelected)
           const locked = hasExternalBlockers(task)
+          const readyDate = taskEstimationReadyDate(task)
+          const readyTitle = readyDate
+            ? ` · Estimation Ready Date ${formatDayMonth(readyDate)}`
+            : ''
           return (
+            <Fragment key={task.id}>
             <button
-              key={task.id}
               type="button"
               draggable
               className={`task-bar${selectedId === task.id ? ' is-selected' : ''}${isCrit ? ' is-critical' : ''}${rootSelected && !inEpic ? ' is-dim' : ''}${locked ? ' has-lock' : ''}`}
@@ -632,12 +669,21 @@ function Lane({
                 e.stopPropagation()
                 onSelect(task.id)
               }}
-              title={`${task.title} · ${placement.start} → ${placement.end}${locked ? ' · есть внешние блокеры' : ''}`}
+              title={`${task.title} · ${placement.start} → ${placement.end}${locked ? ' · есть внешние блокеры' : ''}${readyTitle}`}
             >
               <span className="task-bar-label">{task.title}</span>
               <TfsLink task={task} className="tfs-link tfs-link-inline" />
               {locked && <LockIcon className="task-lock" />}
             </button>
+            {readyDate && (
+              <ReadyDateMark
+                days={days}
+                date={readyDate}
+                dayW={dayW}
+                title={`${task.title} · Estimation Ready Date ${formatDayMonth(readyDate)}`}
+              />
+            )}
+            </Fragment>
           )
         })}
       </div>
