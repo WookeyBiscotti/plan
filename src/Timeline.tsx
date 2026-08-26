@@ -19,7 +19,7 @@ import { TfsLink } from './TfsLink'
 import type { EpicStats, Id, Person, Placement, Task } from './types'
 import { hasExternalBlockers } from './tfsImport'
 import { canPlaceOnTimeline, isTaskEstimated } from './taskEstimate'
-import { taskEstimationReadyDate } from './tfsFieldView'
+import { taskTimelineDateMarks, type TimelineDateMark } from './tfsFieldView'
 import {
   barStyle,
   dateFromPoint,
@@ -83,18 +83,56 @@ function readyDateMarkLeft(days: Date[], iso: string, dayW: number): number | nu
 
 function ReadyDateMark({
   days,
-  date,
+  mark,
   dayW,
-  title,
+  taskTitle,
 }: {
   days: Date[]
-  date: string
+  mark: TimelineDateMark
   dayW: number
-  title: string
+  taskTitle: string
 }) {
-  const left = readyDateMarkLeft(days, date, dayW)
+  const left = readyDateMarkLeft(days, mark.date, dayW)
   if (left == null) return null
-  return <div className="ready-date-mark" style={{ left }} title={title} />
+  return (
+    <div
+      className={`ready-date-mark is-${mark.kind}`}
+      style={{ left }}
+      title={`${taskTitle} · ${mark.label} ${formatDayMonth(mark.date)}`}
+    />
+  )
+}
+
+function TaskDateMarks({
+  days,
+  dayW,
+  task,
+}: {
+  days: Date[]
+  dayW: number
+  task: Task
+}) {
+  const marks = taskTimelineDateMarks(task)
+  if (marks.length === 0) return null
+  return (
+    <>
+      {marks.map((mark) => (
+        <ReadyDateMark
+          key={`${task.id}-${mark.kind}-${mark.date}`}
+          days={days}
+          mark={mark}
+          dayW={dayW}
+          taskTitle={task.title}
+        />
+      ))}
+    </>
+  )
+}
+
+function dateMarksTitle(task: Task): string {
+  return taskTimelineDateMarks(task)
+    .map((mark) => ` · ${mark.label} ${formatDayMonth(mark.date)}`)
+    .join('')
 }
 
 export function Timeline() {
@@ -441,7 +479,6 @@ function scrollToToday() {
                 if (!box) return null
                 const kids = state.tasks.filter((t) => t.parentId === task.id)
                 const color = epicColor(task.id)
-                const readyDate = taskEstimationReadyDate(task)
                 return (
                   <Fragment key={task.id}>
                   <button
@@ -466,14 +503,7 @@ function scrollToToday() {
                         : daysLabel(task.estimateDays)}
                     </em>
                   </button>
-                  {readyDate && (
-                    <ReadyDateMark
-                      days={days}
-                      date={readyDate}
-                      dayW={dayW}
-                      title={`${task.title} · Estimation Ready Date ${formatDayMonth(readyDate)}`}
-                    />
-                  )}
+                  <TaskDateMarks days={days} dayW={dayW} task={task} />
                   </Fragment>
                 )
               })}
@@ -648,10 +678,7 @@ function Lane({
           const isCrit = critical.includes(task.id)
           const inEpic = rootSelected && (task.id === rootSelected || task.parentId === rootSelected)
           const locked = hasExternalBlockers(task)
-          const readyDate = taskEstimationReadyDate(task)
-          const readyTitle = readyDate
-            ? ` · Estimation Ready Date ${formatDayMonth(readyDate)}`
-            : ''
+          const marksTitle = dateMarksTitle(task)
           return (
             <Fragment key={task.id}>
             <button
@@ -669,20 +696,13 @@ function Lane({
                 e.stopPropagation()
                 onSelect(task.id)
               }}
-              title={`${task.title} · ${placement.start} → ${placement.end}${locked ? ' · есть внешние блокеры' : ''}${readyTitle}`}
+              title={`${task.title} · ${placement.start} → ${placement.end}${locked ? ' · есть внешние блокеры' : ''}${marksTitle}`}
             >
               <span className="task-bar-label">{task.title}</span>
               <TfsLink task={task} className="tfs-link tfs-link-inline" />
               {locked && <LockIcon className="task-lock" />}
             </button>
-            {readyDate && (
-              <ReadyDateMark
-                days={days}
-                date={readyDate}
-                dayW={dayW}
-                title={`${task.title} · Estimation Ready Date ${formatDayMonth(readyDate)}`}
-              />
-            )}
+            <TaskDateMarks days={days} dayW={dayW} task={task} />
             </Fragment>
           )
         })}

@@ -14,6 +14,8 @@ const FIELD_ORDER = [
   'Microsoft.VSTS.Scheduling.RemainingWork',
   'Microsoft.VSTS.Scheduling.CompletedWork',
   'Estimation Ready Date',
+  'UAT Expected Date',
+  'UAT Ready Date',
   'System.CreatedDate',
   'System.ChangedDate',
   'System.CreatedBy',
@@ -42,6 +44,8 @@ const FIELD_LABELS: Record<string, string> = {
   'Microsoft.VSTS.Scheduling.RemainingWork': 'Осталось, ч',
   'Microsoft.VSTS.Scheduling.CompletedWork': 'Факт, ч',
   'Estimation Ready Date': 'Estimation Ready Date',
+  'UAT Expected Date': 'UAT Expected Date',
+  'UAT Ready Date': 'UAT Ready Date',
 }
 
 function stripHtml(html: string): string {
@@ -117,14 +121,46 @@ export function hasTfsFields(task: { tfsFields?: Record<string, unknown> }): boo
   return !!task.tfsFields && Object.keys(task.tfsFields).length > 0
 }
 
-function looksLikeReadyDateKey(key: string): boolean {
-  const normalized = key.toLowerCase().replace(/[._]/g, ' ')
-  return (
-    normalized === 'estimation ready date' ||
-    normalized.endsWith(' estimation ready date') ||
-    normalized.endsWith('estimationreadydate')
-  )
+export type TimelineDateMarkKind = 'estimation-ready' | 'uat-expected' | 'uat-ready'
+
+export type TimelineDateMark = {
+  kind: TimelineDateMarkKind
+  label: string
+  date: string
 }
+
+const TIMELINE_DATE_MARKS: Array<{
+  kind: TimelineDateMarkKind
+  label: string
+  exact: string
+  match: (normalized: string) => boolean
+}> = [
+  {
+    kind: 'estimation-ready',
+    label: 'Estimation Ready Date',
+    exact: 'Estimation Ready Date',
+    match: (n) =>
+      n === 'estimation ready date' ||
+      n.endsWith(' estimation ready date') ||
+      n.endsWith('estimationreadydate'),
+  },
+  {
+    kind: 'uat-expected',
+    label: 'UAT Expected Date',
+    exact: 'UAT Expected Date',
+    match: (n) =>
+      n === 'uat expected date' ||
+      n.endsWith(' uat expected date') ||
+      n.endsWith('uatexpecteddate'),
+  },
+  {
+    kind: 'uat-ready',
+    label: 'UAT Ready Date',
+    exact: 'UAT Ready Date',
+    match: (n) =>
+      n === 'uat ready date' || n.endsWith(' uat ready date') || n.endsWith('uatreadydate'),
+  },
+]
 
 function isoDateFromField(value: unknown): string | null {
   if (value == null || value === '') return null
@@ -135,18 +171,39 @@ function isoDateFromField(value: unknown): string | null {
   return null
 }
 
-/** ISO-дата Estimation Ready Date из полей TFS, если есть. */
-export function taskEstimationReadyDate(task: {
-  tfsFields?: Record<string, unknown>
-}): string | null {
-  const fields = task.tfsFields
-  if (!fields) return null
-  const direct = isoDateFromField(fields['Estimation Ready Date'])
+function fieldDateBySpec(
+  fields: Record<string, unknown>,
+  exact: string,
+  match: (normalized: string) => boolean,
+): string | null {
+  const direct = isoDateFromField(fields[exact])
   if (direct) return direct
   for (const [key, value] of Object.entries(fields)) {
-    if (!looksLikeReadyDateKey(key)) continue
+    const normalized = key.toLowerCase().replace(/[._]/g, ' ')
+    if (!match(normalized)) continue
     const iso = isoDateFromField(value)
     if (iso) return iso
   }
   return null
+}
+
+/** Даты-метки с таймлайна из полей TFS (Estimation / UAT). */
+export function taskTimelineDateMarks(task: {
+  tfsFields?: Record<string, unknown>
+}): TimelineDateMark[] {
+  const fields = task.tfsFields
+  if (!fields) return []
+  const marks: TimelineDateMark[] = []
+  for (const spec of TIMELINE_DATE_MARKS) {
+    const date = fieldDateBySpec(fields, spec.exact, spec.match)
+    if (date) marks.push({ kind: spec.kind, label: spec.label, date })
+  }
+  return marks
+}
+
+/** ISO-дата Estimation Ready Date из полей TFS, если есть. */
+export function taskEstimationReadyDate(task: {
+  tfsFields?: Record<string, unknown>
+}): string | null {
+  return taskTimelineDateMarks(task).find((mark) => mark.kind === 'estimation-ready')?.date ?? null
 }

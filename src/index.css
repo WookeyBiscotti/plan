@@ -944,6 +944,24 @@ ul {
   border-top: 7px solid #d06a32;
 }
 
+.ready-date-mark.is-uat-expected::after {
+  border-left-color: #4f7f8b;
+  border-left-style: solid;
+}
+
+.ready-date-mark.is-uat-expected::before {
+  border-top-color: #4f7f8b;
+}
+
+.ready-date-mark.is-uat-ready::after {
+  border-left-color: #5c6b4a;
+  border-left-style: dotted;
+}
+
+.ready-date-mark.is-uat-ready::before {
+  border-top-color: #5c6b4a;
+}
+
 .epic-bar,
 .task-bar,
 .ghost-bar {
