@@ -51,10 +51,6 @@ function Shell() {
           <p className="eyebrow">Команда разработки</p>
           <h1>План</h1>
         </div>
-        <p className="lede">
-          Бросьте крупную оценку на дорожку — появится дата. Разложите на людей и связи: эпик
-          займёт не сумму дней, а длину критического пути.
-        </p>
         <div className="top-meta">
           {last?.stats?.finish && (
             <p>
