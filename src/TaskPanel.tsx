@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { daysLabel, formatDayMonth } from './dates'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { daysLabel, formatDayMonth, parseISO, workDates, workDaysInclusive } from './dates'
 import { wouldCycle } from './schedule'
 import { usePlan, useRootSelected } from './store'
 import { TfsFieldsModal } from './TfsFieldsModal'
@@ -18,9 +18,51 @@ function TfsFieldsButton({ task, onShow }: { task: Task; onShow: (task: Task) =>
   )
 }
 
-export function TaskPanel({ width }: { width: number }) {
-  const { state, schedule, selectedId, setSelectedId, patch, addSubtask, remove, toggleDep, unplace } =
-    usePlan()
+function PanelTitle({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (value: string) => void
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = '0px'
+    el.style.height = `${el.scrollHeight}px`
+  }, [value])
+
+  return (
+    <textarea
+      ref={ref}
+      className="panel-title"
+      rows={1}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  )
+}
+
+function endFromStart(start: string, estimateDays: number): string | null {
+  if (estimateDays <= 0) return null
+  return workDates(parseISO(start), estimateDays).at(-1) ?? null
+}
+
+export function TaskPanel({ width, onHide }: { width: number; onHide?: () => void }) {
+  const {
+    state,
+    schedule,
+    selectedId,
+    setSelectedId,
+    patch,
+    addSubtask,
+    remove,
+    toggleDep,
+    unplace,
+    moveEpicStart,
+  } = usePlan()
   const rootId = useRootSelected()
   const [linking, setLinking] = useState(false)
   const [linkFrom, setLinkFrom] = useState<Id | null>(null)
@@ -29,7 +71,14 @@ export function TaskPanel({ width }: { width: number }) {
   if (!rootId) {
     return (
       <aside className="panel panel-empty" style={{ width, flex: 'none' }}>
-        <h2>Задача</h2>
+        <header className="panel-head">
+          <h2>Задача</h2>
+          {onHide && (
+            <button type="button" className="icon-btn" onClick={onHide} aria-label="Скрыть панель">
+              ×
+            </button>
+          )}
+        </header>
         <p>
           Выберите карточку слева или полосу на таймлайне. Крупную работу можно разложить на
           подзадачи и указать, что от чего зависит — срок станет короче суммы частей, если куски
@@ -45,6 +94,9 @@ export function TaskPanel({ width }: { width: number }) {
   const stats = schedule.stats[root.id]
   const placed = root.start !== null
   const rootEstimated = isTaskEstimated(root)
+  const endEditable = kids.length === 0 || !!root.hideSubtasks
+  const finishIso =
+    stats?.finish ?? (root.start ? endFromStart(root.start, root.estimateDays) : null)
 
   function onSubtaskClick(taskId: Id) {
     if (!linking) {
@@ -59,22 +111,36 @@ export function TaskPanel({ width }: { width: number }) {
     setLinkFrom(null)
   }
 
+  function onStartChange(event: ChangeEvent<HTMLInputElement>) {
+    const date = event.target.value
+    if (!date || !root) return
+    moveEpicStart(root.id, date)
+  }
+
+  function onEndChange(event: ChangeEvent<HTMLInputElement>) {
+    const date = event.target.value
+    if (!date || !root?.start || !endEditable) return
+    const days = workDaysInclusive(parseISO(root.start), parseISO(date))
+    patch(root.id, { estimateDays: Math.max(1, days) })
+  }
+
   return (
     <>
       <aside className="panel" style={{ width, flex: 'none' }}>
         <header className="panel-head">
-          <div>
+          <div className="panel-head-main">
             <p className="eyebrow">{placed ? 'В плане' : 'В бэклоге'}</p>
-            <input
-              className="panel-title"
-              value={root.title}
-              onChange={(e) => patch(root.id, { title: e.target.value })}
-            />
+            <PanelTitle value={root.title} onChange={(title) => patch(root.id, { title })} />
           </div>
           <div className="panel-head-actions">
             <TfsLink task={root} />
             <TfsFieldsButton task={root} onShow={setFieldsTask} />
-            <button type="button" className="icon-btn" onClick={() => setSelectedId(null)} aria-label="Закрыть">
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={() => setSelectedId(null)}
+              aria-label="Закрыть"
+            >
               ×
             </button>
           </div>
@@ -145,6 +211,27 @@ export function TaskPanel({ width }: { width: number }) {
 
       {root.hideSubtasks && kids.length > 0 && placed && !root.assigneeId && (
         <p className="unestimated-hint">Выберите исполнителя, чтобы главная задача появилась на таймлайне.</p>
+      )}
+
+      {placed && root.start && (
+        <div className="dates-fields">
+          <label className="field">
+            Начало
+            <input type="date" value={root.start} onChange={onStartChange} />
+          </label>
+          <label className={`field${endEditable ? '' : ' is-readonly'}`}>
+            Конец
+            <input
+              type="date"
+              value={finishIso ?? ''}
+              disabled={!endEditable || !finishIso}
+              onChange={onEndChange}
+            />
+            {!endEditable && (
+              <em>считается по подзадачам и зависимостям</em>
+            )}
+          </label>
+        </div>
       )}
 
       {root.externalBlockers && root.externalBlockers.length > 0 && (
@@ -310,6 +397,20 @@ function SubtaskRow({
   const others = siblings.filter((s) => s.id !== task.id)
   const estimated = isTaskEstimated(task)
 
+  function onStartChange(event: ChangeEvent<HTMLInputElement>) {
+    const date = event.target.value
+    if (!date) return
+    onPatch(task.id, { start: date })
+  }
+
+  function onEndChange(event: ChangeEvent<HTMLInputElement>) {
+    const date = event.target.value
+    const start = placement?.start ?? task.start
+    if (!date || !start) return
+    const days = workDaysInclusive(parseISO(start), parseISO(date))
+    onPatch(task.id, { estimateDays: Math.max(1, days) })
+  }
+
   return (
     <li
       className={`subtask${selected ? ' is-selected' : ''}${linking ? ' is-linking' : ''}${waitLink ? ' wait-link' : ''}${estimated ? '' : ' is-unestimated'}`}
@@ -357,9 +458,16 @@ function SubtaskRow({
         </button>
       </div>
       {placement && (
-        <p className="sub-dates">
-          {formatDayMonth(placement.start)} → {formatDayMonth(placement.end)}
-        </p>
+        <div className="sub-dates-fields">
+          <label>
+            с
+            <input type="date" value={placement.start} onChange={onStartChange} />
+          </label>
+          <label>
+            по
+            <input type="date" value={placement.end} onChange={onEndChange} />
+          </label>
+        </div>
       )}
       {task.externalBlockers && task.externalBlockers.length > 0 && (
         <ExternalBlockersList blockers={task.externalBlockers} />

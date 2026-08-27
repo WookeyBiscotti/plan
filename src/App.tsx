@@ -7,12 +7,23 @@ import { Timeline } from './Timeline'
 import { PlanSettings } from './PlanSettings'
 import { ProjectIO } from './ProjectIO'
 import { TfsImportDialog } from './TfsImportDialog'
-import { ResizeHandle, useLayoutWidths } from './layoutPrefs'
+import { ResizeHandle, useLayoutPrefs } from './layoutPrefs'
 import { PlanProvider, usePlan } from './store'
 
 function Shell() {
-  const { state, schedule, setSelectedId } = usePlan()
-  const { bodyRef, backlogW, panelW, resizeBacklog, resizePanel } = useLayoutWidths(true)
+  const { state, schedule, selectedId, setSelectedId } = usePlan()
+  const {
+    bodyRef,
+    backlogW,
+    panelW,
+    showBacklog,
+    showPanel,
+    setShowPanel,
+    toggleBacklog,
+    togglePanel,
+    resizeBacklog,
+    resizePanel,
+  } = useLayoutPrefs()
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -21,6 +32,10 @@ function Shell() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [setSelectedId])
+
+  useEffect(() => {
+    if (selectedId) setShowPanel(true)
+  }, [selectedId, setShowPanel])
 
   const finishes = state.tasks
     .filter((t) => t.parentId === null)
@@ -51,6 +66,24 @@ function Shell() {
             </p>
           )}
           <div className="top-actions">
+            <div className="panel-toggles" role="group" aria-label="Панели">
+              <button
+                type="button"
+                className={showBacklog ? 'is-on' : undefined}
+                aria-pressed={showBacklog}
+                onClick={toggleBacklog}
+              >
+                Входящие
+              </button>
+              <button
+                type="button"
+                className={showPanel ? 'is-on' : undefined}
+                aria-pressed={showPanel}
+                onClick={togglePanel}
+              >
+                Задача
+              </button>
+            </div>
             <PlanSettings />
             <TfsImportDialog />
             <TeamEditor />
@@ -59,13 +92,21 @@ function Shell() {
         </div>
       </header>
       <div className="app-body" ref={bodyRef}>
-        <Backlog width={backlogW} />
-        <ResizeHandle label="Ширина бэклога" onDrag={resizeBacklog} />
+        {showBacklog && (
+          <>
+            <Backlog width={backlogW} />
+            <ResizeHandle label="Ширина бэклога" onDrag={resizeBacklog} />
+          </>
+        )}
         <div className="timeline-area">
           <Timeline />
         </div>
-        <ResizeHandle label="Ширина панели задачи" onDrag={resizePanel} />
-        <TaskPanel width={panelW} />
+        {showPanel && (
+          <>
+            <ResizeHandle label="Ширина панели задачи" onDrag={resizePanel} />
+            <TaskPanel width={panelW} onHide={() => setShowPanel(false)} />
+          </>
+        )}
       </div>
     </div>
   )

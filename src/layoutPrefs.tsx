@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'rea
 
 const BACKLOG_W_KEY = 'team-plan-backlog-w'
 const PANEL_W_KEY = 'team-plan-panel-w'
+const BACKLOG_VISIBLE_KEY = 'team-plan-backlog-visible'
+const PANEL_VISIBLE_KEY = 'team-plan-panel-visible'
 
 const DEFAULT_BACKLOG_W = 272
 const DEFAULT_PANEL_W = 360
@@ -22,6 +24,20 @@ function readWidth(key: string, fallback: number): number {
 
 function writeWidth(key: string, width: number) {
   localStorage.setItem(key, String(Math.round(width)))
+}
+
+function readBool(key: string, fallback: boolean): boolean {
+  try {
+    const raw = localStorage.getItem(key)
+    if (raw === null) return fallback
+    return raw === '1' || raw === 'true'
+  } catch {
+    return fallback
+  }
+}
+
+function writeBool(key: string, value: boolean) {
+  localStorage.setItem(key, value ? '1' : '0')
 }
 
 type ResizeHandleProps = {
@@ -67,10 +83,12 @@ export function ResizeHandle({ onDrag, label }: ResizeHandleProps) {
   )
 }
 
-export function useLayoutWidths(hasPanel: boolean) {
+export function useLayoutPrefs() {
   const bodyRef = useRef<HTMLDivElement>(null)
   const [backlogW, setBacklogW] = useState(() => readWidth(BACKLOG_W_KEY, DEFAULT_BACKLOG_W))
   const [panelW, setPanelW] = useState(() => readWidth(PANEL_W_KEY, DEFAULT_PANEL_W))
+  const [showBacklog, setShowBacklog] = useState(() => readBool(BACKLOG_VISIBLE_KEY, true))
+  const [showPanel, setShowPanel] = useState(() => readBool(PANEL_VISIBLE_KEY, true))
 
   useEffect(() => {
     writeWidth(BACKLOG_W_KEY, backlogW)
@@ -80,29 +98,57 @@ export function useLayoutWidths(hasPanel: boolean) {
     writeWidth(PANEL_W_KEY, panelW)
   }, [panelW])
 
+  useEffect(() => {
+    writeBool(BACKLOG_VISIBLE_KEY, showBacklog)
+  }, [showBacklog])
+
+  useEffect(() => {
+    writeBool(PANEL_VISIBLE_KEY, showPanel)
+  }, [showPanel])
+
   const resizeBacklog = useCallback(
     (deltaX: number) => {
       setBacklogW((prev) => {
         const body = bodyRef.current
-        const max = body
-          ? body.clientWidth - MIN_TIMELINE_W - (hasPanel ? panelW + 8 : 4)
-          : prev + deltaX
+        const side = (showPanel ? panelW + 4 : 0) + 4
+        const max = body ? body.clientWidth - MIN_TIMELINE_W - side : prev + deltaX
         return Math.min(Math.max(MIN_BACKLOG_W, prev + deltaX), Math.max(MIN_BACKLOG_W, max))
       })
     },
-    [hasPanel, panelW],
+    [showPanel, panelW],
   )
 
   const resizePanel = useCallback(
     (deltaX: number) => {
       setPanelW((prev) => {
         const body = bodyRef.current
-        const max = body ? body.clientWidth - MIN_TIMELINE_W - backlogW - 8 : prev - deltaX
+        const side = (showBacklog ? backlogW + 4 : 0) + 4
+        const max = body ? body.clientWidth - MIN_TIMELINE_W - side : prev - deltaX
         return Math.min(Math.max(MIN_PANEL_W, prev - deltaX), Math.max(MIN_PANEL_W, max))
       })
     },
-    [backlogW],
+    [showBacklog, backlogW],
   )
 
-  return { bodyRef, backlogW, panelW, resizeBacklog, resizePanel }
+  const toggleBacklog = useCallback(() => {
+    setShowBacklog((v) => !v)
+  }, [])
+
+  const togglePanel = useCallback(() => {
+    setShowPanel((v) => !v)
+  }, [])
+
+  return {
+    bodyRef,
+    backlogW,
+    panelW,
+    showBacklog,
+    showPanel,
+    setShowBacklog,
+    setShowPanel,
+    toggleBacklog,
+    togglePanel,
+    resizeBacklog,
+    resizePanel,
+  }
 }
