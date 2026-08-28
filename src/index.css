@@ -716,12 +716,17 @@ ul {
   border-bottom: 1px solid rgba(232, 220, 200, 0.08);
 }
 
+.lane {
+  --lane-color: #c45c26;
+}
+
 .lane-label {
   position: sticky;
   left: 0;
   z-index: 3;
   background: #181614;
   border-right: 1px solid rgba(232, 220, 200, 0.1);
+  box-shadow: inset 3px 0 0 var(--lane-color);
   padding: 8px 10px;
   display: flex;
   align-items: center;
@@ -852,6 +857,14 @@ ul {
   display: flex;
 }
 
+.epics-body {
+  background: #131210;
+}
+
+.lane .lane-body {
+  background: color-mix(in srgb, var(--lane-color) 7%, transparent);
+}
+
 .axis-months,
 .axis-days {
   display: flex;
@@ -909,11 +922,6 @@ ul {
 
 .epics + .epics {
   border-top: 1px solid rgba(232, 220, 200, 0.06);
-}
-
-.epics-body,
-.lane-body {
-  background: #131210;
 }
 
 .lanes {
@@ -991,10 +999,13 @@ ul {
   border-radius: 2px;
   text-align: left;
   overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
   padding: 0 8px;
   z-index: 1;
+}
+
+.ghost-bar {
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .epic-bar {
@@ -1028,7 +1039,21 @@ ul {
   border-color: rgba(208, 106, 50, 0.55);
 }
 
+.epic-bar-title,
+.task-bar-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.15;
+  white-space: normal;
+  word-break: break-word;
+}
+
 .epic-bar em {
+  flex: none;
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
   font-style: normal;
   font-size: 10px;
@@ -1048,13 +1073,7 @@ ul {
   display: flex;
   align-items: center;
   gap: 4px;
-}
-
-.task-bar-label {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
 }
 
 .task-bar.has-lock {

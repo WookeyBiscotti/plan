@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent, type PointerEvent } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type MouseEvent, type PointerEvent } from 'react'
 import {
   daysLabel,
   formatDay,
@@ -69,10 +69,6 @@ function epicSpan(task: Task): { start: string; end: string } | null {
   const end = workDates(parseISO(task.start), task.estimateDays).at(-1)
   if (!end) return null
   return { start: task.start, end }
-}
-
-function personById(people: Person[], id: Id | null) {
-  return people.find((p) => p.id === id) ?? null
 }
 
 function readyDateMarkLeft(days: Date[], iso: string, dayW: number): number | null {
@@ -495,7 +491,7 @@ function scrollToToday() {
                     onPointerDown={(e) => beginEpicMove(e, task.id, span.start)}
                     onClick={() => setSelectedId(task.id)}
                   >
-                    <span>{task.title}</span>
+                    <span className="epic-bar-title">{task.title}</span>
                     <TfsLink task={task} className="tfs-link tfs-link-inline" />
                     <em>
                       {kids.length > 0 && stats
@@ -531,7 +527,6 @@ function scrollToToday() {
               width={width}
               placements={leafPlacements.filter((p) => p.assigneeId === person.id)}
               tasks={state.tasks}
-              people={visiblePeople}
               selectedId={selectedId}
               rootSelected={rootSelected}
               critical={rootSelected ? schedule.stats[rootSelected]?.critical ?? [] : []}
@@ -569,7 +564,6 @@ function Lane({
   width,
   placements,
   tasks,
-  people,
   selectedId,
   rootSelected,
   critical,
@@ -587,7 +581,6 @@ function Lane({
   width: number
   placements: Placement[]
   tasks: Task[]
-  people: Person[]
   selectedId: Id | null
   rootSelected: Id | null
   critical: Id[]
@@ -606,6 +599,7 @@ function Lane({
   return (
     <div
       className="lane"
+      style={{ '--lane-color': person.color } as CSSProperties}
       onDragOver={(e) => onDragOver(e, person.id)}
       onDrop={(e) => onDrop(e, person.id)}
     >
@@ -674,7 +668,7 @@ function Lane({
           if (!task) return null
           const box = barStyle(days, placement.start, placement.end, dayW)
           if (!box) return null
-          const color = personById(people, placement.assigneeId)?.color ?? person.color
+          const color = person.color
           const isCrit = critical.includes(task.id)
           const inEpic = rootSelected && (task.id === rootSelected || task.parentId === rootSelected)
           const locked = hasExternalBlockers(task)

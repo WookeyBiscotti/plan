@@ -1,8 +1,28 @@
 import { addDays, mondayOnOrBefore, parseISO, todayISO, toISO } from './dates'
 import { DEFAULT_VELOCITY, DEFAULT_WORK_DAY_HOURS } from './taskEstimate'
-import type { ProjectState } from './types'
+import type { Person, ProjectState } from './types'
 
 export const PEOPLE_COLORS = ['#c45c26', '#4f7f8b', '#8b6b4f', '#5c6b4a', '#7a4e5c', '#3f5f7a']
+
+export function normalizePeopleColors(people: Person[]): Person[] {
+  const used = new Set<string>()
+
+  return people.map((person, index) => {
+    let color = person.color?.trim()
+    const normalized = color?.toLowerCase()
+    if (!color || !/^#[0-9a-fA-F]{6}$/.test(color) || (normalized && used.has(normalized))) {
+      let paletteIndex = index
+      color = PEOPLE_COLORS[paletteIndex % PEOPLE_COLORS.length]
+      while (used.has(color.toLowerCase()) && paletteIndex < people.length + PEOPLE_COLORS.length) {
+        paletteIndex += 1
+        color = PEOPLE_COLORS[paletteIndex % PEOPLE_COLORS.length]
+      }
+    }
+
+    used.add(color.toLowerCase())
+    return color === person.color ? person : { ...person, color }
+  })
+}
 
 export function createEmptyProject(): ProjectState {
   return {

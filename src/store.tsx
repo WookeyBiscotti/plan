@@ -2,7 +2,7 @@ import { useEffect, useMemo, useReducer, useState, type ReactNode } from 'react'
 import { createContext, useCallback, useContext } from 'react'
 import { buildSchedule, rootIdOf, wouldCycle } from './schedule'
 import { addDays, mondayOnOrBefore, parseISO, shiftWorkDays, toISO, workDayOffset } from './dates'
-import { createEmptyProject, createSeed, PEOPLE_COLORS } from './seed'
+import { createEmptyProject, createSeed, normalizePeopleColors, PEOPLE_COLORS } from './seed'
 import { mergeImportedTasks } from './tfsImport'
 import {
   applyEstimateSettings,
@@ -21,6 +21,7 @@ function uid(): string {
 function normalizeLoadedState(raw: ProjectState): ProjectState {
   return {
     ...raw,
+    people: normalizePeopleColors(raw.people ?? []),
     workDayHours:
       typeof raw.workDayHours === 'number' && raw.workDayHours > 0
         ? raw.workDayHours

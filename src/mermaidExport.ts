@@ -49,16 +49,9 @@ function criticalTaskIds(schedule: ScheduleResult): Set<Id> {
   return ids
 }
 
-function formatTaskLine(
-  title: string,
-  taskId: Id,
-  start: string,
-  durationDays: number,
-  critical: boolean,
-): string {
+function formatTaskLine(title: string, taskId: Id, start: string, durationDays: number): string {
   const id = mermaidTaskId(taskId)
   const duration = `${durationDays}d`
-  if (critical) return `    ${title} :crit, ${id}, ${start}, ${duration}`
   return `    ${title} :${id}, ${start}, ${duration}`
 }
 
@@ -75,13 +68,15 @@ function pushColorRule(rules: ColorRule[], taskId: Id, color: string): void {
   rules.push({ mermaidId: mermaidTaskId(taskId), color })
 }
 
+function buildColorCss(mermaidId: string, color: string): string {
+  const selectors = [`rect#${mermaidId}`, `#${mermaidId} rect`, `#${mermaidId} .task`, `.task#${mermaidId}`]
+  return selectors
+    .map((selector) => `${selector}{fill:${color}!important;stroke:${color}!important;}`)
+    .join('')
+}
+
 function buildInitDirective(colorRules: ColorRule[]): string {
-  const themeCss = colorRules
-    .map(
-      ({ mermaidId, color }) =>
-        `rect#${mermaidId} { fill: ${color} !important; stroke: ${color} !important; }`,
-    )
-    .join(' ')
+  const themeCss = colorRules.map(({ mermaidId, color }) => buildColorCss(mermaidId, color)).join(' ')
 
   return `%%{init: ${JSON.stringify({
     locale: 'ru',
@@ -125,9 +120,7 @@ export function serializeMermaidGantt(project: ProjectState, schedule: ScheduleR
     const summaryId = `${epic.id}_summary`
     pushColorRule(colorRules, summaryId, epicColor(epic.id))
     const title = escapeMermaidText(epic.title)
-    epicLines.push(
-      formatTaskLine(title, summaryId, stats.start, stats.spanDays, stats.critical.length > 0),
-    )
+    epicLines.push(formatTaskLine(title, summaryId, stats.start, stats.spanDays))
   }
   if (epicLines.length > 0) {
     lines.push('    section Эпики', ...epicLines, '')
@@ -173,12 +166,11 @@ function appendPersonSection(
 
     const comment = dependencyComment(task, tasks)
     if (comment) lines.push(comment)
+    if (critical.has(task.id)) lines.push('    %% критический путь')
 
     pushColorRule(colorRules, task.id, person.color)
     const title = escapeMermaidText(taskDisplayTitle(task, tasks))
-    lines.push(
-      formatTaskLine(title, task.id, placement.start, placement.dates.length, critical.has(task.id)),
-    )
+    lines.push(formatTaskLine(title, task.id, placement.start, placement.dates.length))
   }
   lines.push('')
 }
