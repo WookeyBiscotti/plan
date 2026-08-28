@@ -1,7 +1,19 @@
+import { epicColor } from './timelineView'
 import type { Id, Person, ProjectState, ScheduleResult, Task } from './types'
 
+type ColorRule = {
+  mermaidId: string
+  color: string
+}
+
 function escapeMermaidText(text: string): string {
-  return text.replace(/:/g, '—').replace(/#/g, '').replace(/;/g, ',').replace(/\n/g, ' ')
+  return text
+    .replace(/:/g, ' - ')
+    .replace(/#/g, '')
+    .replace(/;/g, ',')
+    .replace(/\n/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function mermaidTaskId(id: Id): string {
@@ -16,7 +28,7 @@ function taskById(tasks: Task[]): Map<Id, Task> {
 function taskDisplayTitle(task: Task, tasks: Map<Id, Task>): string {
   if (task.parentId) {
     const parent = tasks.get(task.parentId)
-    if (parent) return `${parent.title} → ${task.title}`
+    if (parent) return `${parent.title} / ${task.title}`
   }
   return task.title
 }
@@ -39,46 +51,63 @@ function criticalTaskIds(schedule: ScheduleResult): Set<Id> {
 
 function formatTaskLine(
   title: string,
-  id: Id,
+  taskId: Id,
+  start: string,
   durationDays: number,
-  start: string | null,
-  afterIds: Id[],
   critical: boolean,
 ): string {
-  const tags = critical ? 'crit, ' : ''
-  const mermaidId = mermaidTaskId(id)
+  const id = mermaidTaskId(taskId)
   const duration = `${durationDays}d`
-  if (afterIds.length > 0) {
-    const deps = afterIds.map(mermaidTaskId).join(' ')
-    return `    ${title} :${tags}${mermaidId}, after ${deps}, ${duration}`
-  }
-  if (!start) return ''
-  return `    ${title} :${tags}${mermaidId}, ${start}, ${duration}`
+  if (critical) return `    ${title} :crit, ${id}, ${start}, ${duration}`
+  return `    ${title} :${id}, ${start}, ${duration}`
+}
+
+function dependencyComment(task: Task, tasks: Map<Id, Task>): string | null {
+  if (task.dependsOn.length === 0) return null
+  const names = task.dependsOn
+    .map((id) => tasks.get(id)?.title)
+    .filter((name): name is string => Boolean(name))
+  if (names.length === 0) return null
+  return `    %% зависит от: ${names.join(', ')}`
+}
+
+function pushColorRule(rules: ColorRule[], taskId: Id, color: string): void {
+  rules.push({ mermaidId: mermaidTaskId(taskId), color })
+}
+
+function buildInitDirective(colorRules: ColorRule[]): string {
+  const themeCss = colorRules
+    .map(
+      ({ mermaidId, color }) =>
+        `rect#${mermaidId} { fill: ${color} !important; stroke: ${color} !important; }`,
+    )
+    .join(' ')
+
+  return `%%{init: ${JSON.stringify({
+    locale: 'ru',
+    themeCSS: themeCss,
+    gantt: { topAxis: true },
+  })}}%%`
 }
 
 export function serializeMermaidGantt(project: ProjectState, schedule: ScheduleResult): string {
   const tasks = taskById(project.tasks)
   const critical = criticalTaskIds(schedule)
-  const exportableTaskIds = new Set(
-    Object.values(schedule.placements)
-      .filter((placement) => {
-        const task = tasks.get(placement.taskId)
-        return task && isLeafPlacement(task, tasks)
-      })
-      .map((placement) => placement.taskId),
-  )
+  const colorRules: ColorRule[] = []
 
   const lines = [
     'gantt',
-    '    title План команды',
     '    dateFormat YYYY-MM-DD',
-    '    axisFormat %d.%m',
+    '    axisFormat %B %Y',
+    '    tickInterval 1month',
+    '    weekday monday',
+    '    title План команды',
     '    excludes weekends',
     '',
   ]
 
   if (schedule.errors.length > 0) {
-    lines.push(`    %% Ошибки планирования: ${schedule.errors.join('; ')}`, '')
+    lines.push(`    %% scheduling errors: ${schedule.errors.join('; ')}`, '')
   }
 
   const epicTasks = project.tasks.filter(
@@ -89,31 +118,28 @@ export function serializeMermaidGantt(project: ProjectState, schedule: ScheduleR
       project.tasks.some((child) => child.parentId === task.id),
   )
 
-  if (epicTasks.length > 0) {
-    lines.push('    section Эпики')
-    for (const epic of epicTasks) {
-      const stats = schedule.stats[epic.id]
-      if (!stats?.start || !stats.finish || stats.spanDays <= 0) continue
-      const title = escapeMermaidText(epic.title)
-      const line = formatTaskLine(
-        title,
-        `${epic.id}_summary`,
-        stats.spanDays,
-        stats.start,
-        [],
-        stats.critical.length > 0,
-      )
-      if (line) lines.push(line)
-    }
-    lines.push('')
+  const epicLines: string[] = []
+  for (const epic of epicTasks) {
+    const stats = schedule.stats[epic.id]
+    if (!stats?.start || !stats.finish || stats.spanDays <= 0) continue
+    const summaryId = `${epic.id}_summary`
+    pushColorRule(colorRules, summaryId, epicColor(epic.id))
+    const title = escapeMermaidText(epic.title)
+    epicLines.push(
+      formatTaskLine(title, summaryId, stats.start, stats.spanDays, stats.critical.length > 0),
+    )
+  }
+  if (epicLines.length > 0) {
+    lines.push('    section Эпики', ...epicLines, '')
   }
 
   const visiblePeople = project.people.filter((person) => !person.timelineHidden)
   for (const person of visiblePeople) {
-    appendPersonSection(lines, person, schedule, tasks, exportableTaskIds, critical)
+    appendPersonSection(lines, person, schedule, tasks, critical, colorRules)
   }
 
-  return `${lines.join('\n').trimEnd()}\n`
+  const body = [buildInitDirective(colorRules), ...lines].join('\n').trimEnd()
+  return `\`\`\`mermaid\n${body}\n\`\`\`\n`
 }
 
 function appendPersonSection(
@@ -121,9 +147,18 @@ function appendPersonSection(
   person: Person,
   schedule: ScheduleResult,
   tasks: Map<Id, Task>,
-  exportableTaskIds: Set<Id>,
   critical: Set<Id>,
+  colorRules: ColorRule[],
 ): void {
+  const exportableTaskIds = new Set(
+    Object.values(schedule.placements)
+      .filter((placement) => {
+        const task = tasks.get(placement.taskId)
+        return task && isLeafPlacement(task, tasks)
+      })
+      .map((placement) => placement.taskId),
+  )
+
   const placements = Object.values(schedule.placements)
     .filter((placement) => placement.assigneeId === person.id)
     .filter((placement) => exportableTaskIds.has(placement.taskId))
@@ -136,17 +171,14 @@ function appendPersonSection(
     const task = tasks.get(placement.taskId)
     if (!task) continue
 
-    const afterIds = task.dependsOn.filter((depId) => exportableTaskIds.has(depId))
+    const comment = dependencyComment(task, tasks)
+    if (comment) lines.push(comment)
+
+    pushColorRule(colorRules, task.id, person.color)
     const title = escapeMermaidText(taskDisplayTitle(task, tasks))
-    const line = formatTaskLine(
-      title,
-      task.id,
-      placement.dates.length,
-      placement.start,
-      afterIds,
-      critical.has(task.id),
+    lines.push(
+      formatTaskLine(title, task.id, placement.start, placement.dates.length, critical.has(task.id)),
     )
-    if (line) lines.push(line)
   }
   lines.push('')
 }
@@ -157,11 +189,11 @@ export function downloadMermaidGantt(
   filename?: string,
 ): void {
   const text = serializeMermaidGantt(project, schedule)
-  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+  const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = filename ?? `plan-${project.planStart}.mmd`
+  link.download = filename ?? `plan-${project.planStart}.md`
   link.click()
   URL.revokeObjectURL(url)
 }
