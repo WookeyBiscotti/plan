@@ -1,15 +1,21 @@
 import { useRef, useState } from 'react'
+import { downloadMermaidGantt } from './mermaidExport'
 import { downloadProjectYaml, parseProjectYaml } from './projectYaml'
 import { usePlan } from './store'
 
 export function ProjectIO() {
-  const { state, importProject, clearProject, reset } = usePlan()
+  const { state, schedule, importProject, clearProject, reset } = usePlan()
   const fileRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState('')
 
-  function onExport() {
+  function onExportYaml() {
     setError('')
     downloadProjectYaml(state)
+  }
+
+  function onExportMermaid() {
+    setError('')
+    downloadMermaidGantt(state, schedule)
   }
 
   function onImportClick() {
@@ -59,8 +65,11 @@ export function ProjectIO() {
         hidden
         onChange={(event) => void onFileChange(event.target.files?.[0])}
       />
-      <button type="button" onClick={onExport}>
+      <button type="button" onClick={onExportYaml}>
         Экспорт YAML
+      </button>
+      <button type="button" onClick={onExportMermaid}>
+        Экспорт Mermaid
       </button>
       <button type="button" onClick={onImportClick}>
         Импорт YAML
